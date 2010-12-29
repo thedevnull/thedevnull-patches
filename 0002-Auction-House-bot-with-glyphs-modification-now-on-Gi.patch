@@ -1,0 +1,304 @@
+From 1ffe1bb78e34f3f5e154f902acb91ca07d58d0b2 Mon Sep 17 00:00:00 2001
+From: thedevnull <daniellage18@gmail.com>
+Date: Wed, 29 Dec 2010 20:32:47 -0200
+Subject: [PATCH 2/5] Auction House bot with glyphs (modification) now on Git ;)
+ Signed-off-by: thedevnull <daniellage18@gmail.com>
+
+---
+ .../AuctionHouseBot/AuctionHouseBot.cpp            |  151 ++++++++++++++++----
+ .../AuctionHouse/AuctionHouseBot/AuctionHouseBot.h |   10 ++
+ src/server/worldserver/worldserver.conf.dist       |   17 +++
+ 3 files changed, 152 insertions(+), 26 deletions(-)
+
+diff --git a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
+index 536ec4b..0e25d02 100644
+--- a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
++++ b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
+@@ -24,6 +24,7 @@
+ 
+ using namespace std;
+ vector<uint32> npcItems;
++vector<uint32> glyphItemsBin;
+ vector<uint32> lootItems;
+ vector<uint32> greyTradeGoodsBin;
+ vector<uint32> whiteTradeGoodsBin;
+@@ -101,6 +102,16 @@ AuctionHouseBot::AuctionHouseBot()
+     DisableItemsAboveReqSkillRank = 0;
+     DisableTGsBelowReqSkillRank = 0;
+     DisableTGsAboveReqSkillRank = 0;
++	//glyphs patch
++	SellGlyphs = false;
++	GlyphsCount = 0;
++	DisableGlyphBelowLevel = 0;
++	DisableGlyphAboveLevel = 0;
++	GlyphBuyOutPriceMin = 0;
++	GlyphBuyOutPriceMax = 0;
++	GlyphBidPriceMin = 0;
++	GlyphBidPriceMax = 0;
++	// <- end glyphs patch
+ 
+     //End Filters
+ 
+@@ -119,6 +130,8 @@ AuctionHouseBot::~AuctionHouseBot()
+ 
+ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+ {
++	bool glyphMode = false;
++
+     if (!AHBSeller)
+     {
+         if (debug_Out) sLog->outError("AHSeller: Disabled");
+@@ -147,23 +160,43 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+ 
+     uint32 auctions = auctionHouse->Getcount();
+ 
+-    if (auctions >= minItems)
+-    {
+-        //if (debug_Out) sLog->outString("AHSeller: Auctions above minimum");
+-        return;
+-    }
+-
+-    if (auctions >= maxItems)
+-    {
+-        //if (debug_Out) sLog->outString("AHSeller: Auctions at or above maximum");
+-        return;
+-    }
+-
+     uint32 items = 0;
+-    if ((maxItems - auctions) >= ItemsPerCycle)
+-        items = ItemsPerCycle;
+-    else
+-        items = (maxItems - auctions);
++
++	if(SellGlyphs)
++	{
++		if(GlyphsCount <= 0)
++			GlyphsCount = 400;
++
++		if(auctions >= minItems)
++			glyphMode = true;
++
++		if(auctions >= (maxItems + GlyphsCount))
++			return;
++
++		if (((maxItems + GlyphsCount) - auctions) >= ItemsPerCycle)
++			items = ItemsPerCycle;
++		else
++			items = ((maxItems + GlyphsCount) - auctions);
++	}
++	else
++	{
++		if (auctions >= minItems)
++		{
++			//if (debug_Out) sLog.outString("AHSeller: Auctions above minimum");
++			return;
++		}
++
++		if (auctions >= maxItems)
++		{
++			//if (debug_Out) sLog.outString("AHSeller: Auctions at or above maximum");
++			return;
++		}
++
++		if ((maxItems - auctions) >= ItemsPerCycle)
++			items = ItemsPerCycle;
++		else
++			items = (maxItems - auctions);
++	}
+ 
+     if (debug_Out) sLog->outString("AHSeller: Adding %u Auctions", items);
+ 
+@@ -222,6 +255,7 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+     uint32 purpleItems = config->GetItemCounts(AHB_PURPLE_I);
+     uint32 orangeItems = config->GetItemCounts(AHB_ORANGE_I);
+     uint32 yellowItems = config->GetItemCounts(AHB_YELLOW_I);
++
+     if (debug_Out) sLog->outString("AHSeller: %u items", items);
+ 
+     // only insert a few at a time, so as not to peg the processor
+@@ -235,6 +269,8 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+         {
+             ++loopbreaker;
+             uint32 choice = urand(0, 13);
++			if(glyphMode)
++				choice = 14;
+             itemColor = choice;
+             switch (choice)
+             {
+@@ -336,6 +372,13 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+                     else continue;
+                     break;
+                 }
++			case 14:
++                {
++					if (glyphItemsBin.size() > 0)
++						itemID = glyphItemsBin[urand(0, glyphItemsBin.size() - 1)];
++					else continue;
++                    break;
++                }
+             default:
+                 {
+                     if (debug_Out) sLog->outError("AHSeller: itemID Switch - Default Reached");
+@@ -384,16 +427,27 @@ void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
+ 
+             if ((prototype->Quality >= 0) && (prototype->Quality <= AHB_MAX_QUALITY))
+             {
+-                if (config->GetMaxStack(prototype->Quality) > 1 && item->GetMaxStackCount() > 1)
+-                    stackCount = urand(1, minValue(item->GetMaxStackCount(), config->GetMaxStack(prototype->Quality)));
+-                else if (config->GetMaxStack(prototype->Quality) == 0 && item->GetMaxStackCount() > 1)
+-                    stackCount = urand(1, item->GetMaxStackCount());
+-                else
+-                    stackCount = 1;
+-                buyoutPrice *= urand(config->GetMinPrice(prototype->Quality), config->GetMaxPrice(prototype->Quality));
+-                buyoutPrice /= 100;
+-                bidPrice = buyoutPrice * urand(config->GetMinBidPrice(prototype->Quality), config->GetMaxBidPrice(prototype->Quality));
+-                bidPrice /= 100;
++				if(!glyphMode)
++				{
++					if (config->GetMaxStack(prototype->Quality) > 1 && item->GetMaxStackCount() > 1)
++						stackCount = urand(1, minValue(item->GetMaxStackCount(), config->GetMaxStack(prototype->Quality)));
++					else if (config->GetMaxStack(prototype->Quality) == 0 && item->GetMaxStackCount() > 1)
++						stackCount = urand(1, item->GetMaxStackCount());
++					else
++						stackCount = 1;
++					buyoutPrice *= urand(config->GetMinPrice(prototype->Quality), config->GetMaxPrice(prototype->Quality));
++					buyoutPrice /= 100;
++					bidPrice = buyoutPrice * urand(config->GetMinBidPrice(prototype->Quality), config->GetMaxBidPrice(prototype->Quality));
++					bidPrice /= 100;
++				}
++				else
++				{
++					buyoutPrice = urand(GlyphBuyOutPriceMin, GlyphBuyOutPriceMax);
++					bidPrice = urand(GlyphBidPriceMin, GlyphBidPriceMax);
++					if(buyoutPrice<bidPrice)
++						bidPrice = buyoutPrice - 1;
++					stackCount = 1;
++				}
+             }
+             else
+             {
+@@ -819,6 +873,14 @@ void AuctionHouseBot::Initialize()
+     DisableItemsAboveReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsAboveReqSkillRank", 0);
+     DisableTGsBelowReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsBelowReqSkillRank", 0);
+     DisableTGsAboveReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsAboveReqSkillRank", 0);
++	SellGlyphs = sConfig->GetBoolDefault("AuctionHouseBot.SellGlyphs", false);
++	GlyphsCount = sConfig->GetIntDefault("AuctionHouseBot.GlyphsCount", 0);
++	DisableGlyphBelowLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableGlyphBelowLevel", 0);
++	DisableGlyphAboveLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableGlyphAboveLevel", 0);
++	GlyphBuyOutPriceMin = sConfig->GetIntDefault("AuctionHouseBot.GlyphBuyOutPriceMin", 0);
++	GlyphBuyOutPriceMax = sConfig->GetIntDefault("AuctionHouseBot.GlyphBuyOutPriceMax", 0);
++	GlyphBidPriceMin = sConfig->GetIntDefault("AuctionHouseBot.GlyphBidPriceMin", 0);
++	GlyphBidPriceMax = sConfig->GetIntDefault("AuctionHouseBot.GlyphBidPriceMax", 0);
+ 
+     //End Filters
+     if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))
+@@ -861,6 +923,41 @@ void AuctionHouseBot::Initialize()
+             if (debug_Out) sLog->outString("AuctionHouseBot: \"%s\" failed", npcQuery);
+         }
+ 
++		if(SellGlyphs)
++		{
++			if(DisableGlyphBelowLevel > 80)
++				DisableGlyphBelowLevel = 0;
++			if(DisableGlyphAboveLevel < DisableGlyphBelowLevel)
++				DisableGlyphAboveLevel = DisableGlyphBelowLevel;
++			if(DisableGlyphAboveLevel == 0)
++				DisableGlyphAboveLevel = 85;
++
++			if(GlyphBidPriceMin <= 0)
++				GlyphBidPriceMin = 8000;
++			if(GlyphBidPriceMin > GlyphBidPriceMax)
++				GlyphBidPriceMax = GlyphBidPriceMin;
++			if(GlyphBuyOutPriceMin <= 0)
++				GlyphBuyOutPriceMin = 10000;
++			if(GlyphBuyOutPriceMin > GlyphBuyOutPriceMax)
++				GlyphBuyOutPriceMax = GlyphBuyOutPriceMin;
++
++
++			results = WorldDatabase.PQuery("SELECT entry FROM item_template WHERE class = 16 AND RequiredLevel >= %u AND RequiredLevel <= %u", DisableGlyphBelowLevel, DisableGlyphAboveLevel);
++			if (results != NULL)
++			{
++				do
++				{
++					Field* fields = results->Fetch();
++					glyphItemsBin.push_back(fields[0].GetUInt32());
++
++				} while (results->NextRow());
++			}
++			else
++			{
++				if (debug_Out) sLog->outString("AuctionHouseBot: query glyphs failed");
++			}
++		}
++
+         char lootQuery[] = "SELECT item FROM creature_loot_template UNION "
+             "SELECT item FROM reference_loot_template UNION "
+             "SELECT item FROM disenchant_loot_template UNION "
+@@ -1377,6 +1474,8 @@ void AuctionHouseBot::Initialize()
+         sLog->outString("loaded %u purple items", purpleItemsBin.size());
+         sLog->outString("loaded %u orange items", orangeItemsBin.size());
+         sLog->outString("loaded %u yellow items", yellowItemsBin.size());
++		sLog->outString("loaded %u glyph items", glyphItemsBin.size());
++
+     }
+     sLog->outString("AuctionHouseBot and AuctionHouseBuyer have been loaded.");
+ }
+diff --git a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
+index 6c3cf82..a7da388 100644
+--- a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
++++ b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
+@@ -46,6 +46,7 @@
+ #define AHB_PURPLE_I    11
+ #define AHB_ORANGE_I    12
+ #define AHB_YELLOW_I    13
++#define AHB_GLYPH		14
+ 
+ class AHBConfig
+ {
+@@ -1214,6 +1215,15 @@ private:
+     uint32 DisableTGsBelowReqSkillRank;
+     uint32 DisableTGsAboveReqSkillRank;
+ 
++	bool SellGlyphs;
++	uint32 GlyphsCount;
++	uint32 DisableGlyphBelowLevel;
++	uint32 DisableGlyphAboveLevel;
++	uint32 GlyphBuyOutPriceMin;
++	uint32 GlyphBuyOutPriceMax;
++	uint32 GlyphBidPriceMin;
++	uint32 GlyphBidPriceMax;
++
+     //End Filters
+ 
+     AHBConfig AllianceConfig;
+diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
+index f248ed8..cdaa2b0 100644
+--- a/src/server/worldserver/worldserver.conf.dist
++++ b/src/server/worldserver/worldserver.conf.dist
+@@ -2750,6 +2750,23 @@ AuctionHouseBot.DisableItemsAboveReqSkillRank = 0
+ AuctionHouseBot.DisableTGsBelowReqSkillRank = 0
+ AuctionHouseBot.DisableTGsAboveReqSkillRank = 0
+ 
++###############################################################################
++# AUCTION HOUSE BOT GLYPHS PART
++#
++#    AuctionHouseBot.SellGlyphs
++#    Default 0 (Off)
++#
++###############################################################################
++
++AuctionHouseBot.SellGlyphs = 0
++AuctionHouseBot.GlyphsCount = 0
++AuctionHouseBot.DisableGlyphBelowLevel = 0
++AuctionHouseBot.DisableGlyphAboveLevel = 0
++AuctionHouseBot.GlyphBuyOutPriceMin = 0
++AuctionHouseBot.GlyphBuyOutPriceMax = 0
++AuctionHouseBot.GlyphBidPriceMin = 0
++AuctionHouseBot.GlyphBidPriceMax = 0
++
+ ###################################################################################################
+ # CONSOLE AND REMOTE ACCESS
+ #
+-- 
+1.7.3.1.msysgit.0
+
