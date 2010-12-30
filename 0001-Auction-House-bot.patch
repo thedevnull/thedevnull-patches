@@ -1,7 +1,7 @@
-From 4aad1e07a1abe445208b4b8651e1c70e5bb632d9 Mon Sep 17 00:00:00 2001
+From a2a736ec1479af9188e8570d1ebaaf87363e9616 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Wed, 29 Dec 2010 20:31:41 -0200
-Subject: [PATCH 1/5] Auction House bot patch - now on Git :)
+Date: Thu, 30 Dec 2010 18:46:38 -0200
+Subject: [PATCH 1/5] Auction House bot
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
