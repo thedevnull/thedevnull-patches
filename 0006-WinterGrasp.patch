@@ -1,13 +1,13 @@
-From 98071a50cc40eacb46b7946413d6ce341b59fe99 Mon Sep 17 00:00:00 2001
+From a4be55c049d3875adf3f5f444f6f7264babfc450 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 6 Jan 2011 11:51:27 -0200
+Date: Thu, 6 Jan 2011 17:44:27 -0200
 Subject: [PATCH 6/6] WinterGrasp
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
  sql/Wintergrasp/Wintergrasp_world.sql              |  113 +
  src/server/game/CMakeLists.txt                     |    1 +
- src/server/game/Chat/Chat.cpp                      |   13 +
+ src/server/game/Chat/Chat.cpp                      |   12 +
  src/server/game/Chat/Chat.h                        |    7 +
  src/server/game/Chat/Commands/Level2.cpp           |  146 ++
  src/server/game/Entities/Player/Player.cpp         |    8 +
@@ -16,8 +16,7 @@ Subject: [PATCH 6/6] WinterGrasp
  src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp       |    1 +
  src/server/game/Scripting/ScriptLoader.cpp         |    4 +
  .../Protocol/Handlers/BattleGroundHandler.cpp      |   25 +
- .../Server/Protocol/Handlers/CharacterHandler.cpp  |   17 +
- .../game/Server/Protocol/Handlers/ChatHandler.cpp  |    4 +
+ .../Server/Protocol/Handlers/CharacterHandler.cpp  |   20 +
  src/server/game/Spells/Auras/SpellAuraEffects.cpp  |    8 +
  src/server/game/Spells/Spell.cpp                   |   12 +
  src/server/game/Spells/SpellEffects.cpp            |   35 +
@@ -31,7 +30,7 @@ Subject: [PATCH 6/6] WinterGrasp
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp     | 2290 ++++++++++++++++++++
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.h       |  339 +++
  src/server/worldserver/worldserver.conf.dist       |  127 ++
- 26 files changed, 3359 insertions(+), 1 deletions(-)
+ 25 files changed, 3357 insertions(+), 1 deletions(-)
  create mode 100644 sql/Wintergrasp/Wintergrasp_world.sql
  create mode 100644 src/server/scripts/Northrend/wintergrasp.cpp
  create mode 100644 src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp
@@ -39,18 +38,18 @@ Subject: [PATCH 6/6] WinterGrasp
 
 diff --git a/sql/Wintergrasp/Wintergrasp_world.sql b/sql/Wintergrasp/Wintergrasp_world.sql
 new file mode 100644
-index 0000000..fb220d1
+index 0000000..a918659
 --- /dev/null
 +++ b/sql/Wintergrasp/Wintergrasp_world.sql
 @@ -0,0 +1,113 @@
 +DELETE FROM `trinity_string` WHERE entry IN (756,757,758,759,760,761,762,763,764,765,766,767,768,769,770,771,772,780,781);
-+REPLACE INTO `trinity_string` VALUES ('756', 'Battle begins!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Battle begins!');
-+REPLACE INTO `trinity_string` VALUES ('757', '%s has successfully defended the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s has successfully defended the fortress!');
-+REPLACE INTO `trinity_string` VALUES ('758', '%s has taken over the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s has taken over the fortress!');
++REPLACE INTO `trinity_string` VALUES ('756', 'Battle begins!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва началась');
++REPLACE INTO `trinity_string` VALUES ('757', '%s has successfully defended the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s успешно защитил(а) крепость!');
++REPLACE INTO `trinity_string` VALUES ('758', '%s has taken over the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s захватил(а) крепость');
 +REPLACE INTO `trinity_string` VALUES ('759', 'The %s siege workshop has been damaged by the %s!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('760', 'The %s siege workshop has been destroyed by the %s!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-+REPLACE INTO `trinity_string` VALUES ('761', 'The %s tower has been damaged!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The %s tower has been damaged!');
-+REPLACE INTO `trinity_string` VALUES ('762', 'The %s tower has been destroyed!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The %s tower has been destroyed!');
++REPLACE INTO `trinity_string` VALUES ('761', 'The %s tower has been damaged!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s башня повреждена');
++REPLACE INTO `trinity_string` VALUES ('762', 'The %s tower has been destroyed!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s башня уничтожена!');
 +REPLACE INTO `trinity_string` VALUES ('763', 'Wintergrasp fortress is under attack!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('764', 'Wintergrasp is now under the control of the %s.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('765', 'Wintergrasp timer set to %s.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
@@ -59,12 +58,12 @@ index 0000000..fb220d1
 +REPLACE INTO `trinity_string` VALUES ('768', 'Wintergrasp info: %s controlled. Timer: %s. Wartime: %s. Number of Players: (Horde: %u, Alliance: %u)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('769', 'Wintergrasp outdoorPvP is disabled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('770', 'Wintergrasp outdoorPvP is enabled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-+REPLACE INTO `trinity_string` VALUES ('771', 'You have reached Rank 1: Corporal', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'You have reached Rank 1: Corporal');
-+REPLACE INTO `trinity_string` VALUES ('772', 'You have reached Rank 2: First Lieutenant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'You have reached Rank 2: First Lieutenant');
-+REPLACE INTO `trinity_string` VALUES ('780', 'Before the Battle of  Wintergrasp left 30 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Before the Battle of  Wintergrasp left 30 minutes!');
-+REPLACE INTO `trinity_string` VALUES ('781', 'Before the Battle of  Wintergrasp left 10 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Before the Battle of  Wintergrasp left 10 minutes!');
-+REPLACE INTO `trinity_string` VALUES ('782', 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.');
-+REPLACE INTO `trinity_string` VALUES ('783', 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.');
++REPLACE INTO `trinity_string` VALUES ('771', 'You have reached Rank 1: Corporal', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Вы достигли Ранга 1: Капрал');
++REPLACE INTO `trinity_string` VALUES ('772', 'You have reached Rank 2: First Lieutenant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Вы достигли Ранга 2: Лейтенант');
++REPLACE INTO `trinity_string` VALUES ('780', 'Before the Battle of  Wintergrasp left 30 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'До битвы на  Озере Ледяных Оков осталось 30 минут!');
++REPLACE INTO `trinity_string` VALUES ('781', 'Before the Battle of  Wintergrasp left 10 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'До битвы на  Озере Ледяных Оков осталось 10 минут!');
++REPLACE INTO `trinity_string` VALUES ('782', 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва за Озеро Ледяных Оков Остановлена. Не хватает защитников. Крепость переходит атакующей  стороне.');
++REPLACE INTO `trinity_string` VALUES ('783', 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва за Озеро Ледяных Оков Остановлена. Не хватает нападающих. Крепость остается защитникам.');
 +
 +DELETE FROM `command` WHERE name IN ('wg','wg enable','wg start','wg status','wg stop','wg switch','wg timer');
 +REPLACE INTO `command` VALUES ('wg', '3', 'Syntax: .wg $subcommand.');
@@ -169,7 +168,7 @@ index 3a3f76e..41a99b9 100644
    ${MYSQL_INCLUDE_DIR}
    ${OPENSSL_INCLUDE_DIR}
 diff --git a/src/server/game/Chat/Chat.cpp b/src/server/game/Chat/Chat.cpp
-index 9d1dc6d..123733a 100755
+index 9d1dc6d..5a0802a 100755
 --- a/src/server/game/Chat/Chat.cpp
 +++ b/src/server/game/Chat/Chat.cpp
 @@ -351,6 +351,17 @@ ChatCommand * ChatHandler::getCommandTable()
@@ -190,12 +189,11 @@ index 9d1dc6d..123733a 100755
      static ChatCommand commandTable[] =
      {
          { "character",      SEC_GAMEMASTER,     true,  NULL,                                           "", characterCommandTable},
-@@ -441,6 +452,8 @@ ChatCommand * ChatHandler::getCommandTable()
+@@ -441,6 +452,7 @@ ChatCommand * ChatHandler::getCommandTable()
          // Playerbot mod
          { "bot",            SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandlePlayerbotCommand>,             "", NULL },
          { "maintank",       SEC_PLAYER,  false, OldHandler<&ChatHandler::HandlePlayerbotMainTankCommand>,             "", NULL },
-+		// WinterGrasp commands
-+		{ "wg",             SEC_ADMINISTRATOR,  false, NULL,                                           "", wintergraspCommandTable },
++        { "wg",             SEC_ADMINISTRATOR,  false, NULL,                                           "", wintergraspCommandTable },
          { NULL,             0,                  false, NULL,                                           "", NULL }
      };
  
@@ -558,10 +556,20 @@ index 0641007..c0d02fc 100755
  
  
 diff --git a/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp b/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
-index 57fd279..ef065ee 100755
+index 57fd279..4f539be 100755
 --- a/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
-@@ -833,6 +833,23 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
+@@ -45,6 +45,9 @@
+ #include "Config.h"
+ #include "PlayerbotAI.h"
+ 
++#include "OutdoorPvPWG.h"
++#include "OutdoorPvPMgr.h"
++
+ class LoginQueryHolder : public SQLQueryHolder
+ {
+     private:
+@@ -833,6 +836,23 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
      sObjectAccessor->AddObject(pCurrChar);
      //sLog->outDebug("Player %s added to Map.",pCurrChar->GetName());
  
@@ -585,21 +593,6 @@ index 57fd279..ef065ee 100755
      pCurrChar->SendInitialPacketsAfterAddToMap();
  
      CharacterDatabase.PExecute("UPDATE characters SET online = 1 WHERE guid = '%u'", pCurrChar->GetGUIDLow());
-diff --git a/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp b/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
-index 27e4d5d..7e20cfa 100755
---- a/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
-+++ b/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
-@@ -42,6 +42,10 @@
- //Playerbot mod
- #include "PlayerbotAI.h"
- 
-+//WinterGrasp
-+#include "OutdoorPvPWG.h"
-+#include "OutdoorPvPMgr.h"
-+
- 
- 
- 
 diff --git a/src/server/game/Spells/Auras/SpellAuraEffects.cpp b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 index 7ba40a1..d410d6c 100755
 --- a/src/server/game/Spells/Auras/SpellAuraEffects.cpp
