@@ -1,7 +1,7 @@
-From a2a736ec1479af9188e8570d1ebaaf87363e9616 Mon Sep 17 00:00:00 2001
+From 680b23aff52f295375d2bf640a6e96ca2cc27cb5 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 30 Dec 2010 18:46:38 -0200
-Subject: [PATCH 1/5] Auction House bot
+Date: Thu, 6 Jan 2011 11:44:15 -0200
+Subject: [PATCH 2/6] Ahbot
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -3489,7 +3489,7 @@ index 0000000..6c3cf82
 +
 +#endif
 diff --git a/src/server/game/AuctionHouse/AuctionHouseMgr.cpp b/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
-index 2fd3114..5fa9799 100644
+index 0b23e37..a823754 100644
 --- a/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
 +++ b/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
 @@ -218,7 +218,7 @@ void AuctionHouseMgr::SendAuctionSuccessfulMail(AuctionEntry * auction, SQLTrans
@@ -3533,7 +3533,7 @@ index 2fd3114..5fa9799 100644
  
      sScriptMgr->OnAuctionRemove(this, auction);
 diff --git a/src/server/game/AuctionHouse/AuctionHouseMgr.h b/src/server/game/AuctionHouse/AuctionHouseMgr.h
-index 27ed717..039893c 100644
+index bf9edbc..910eed4 100644
 --- a/src/server/game/AuctionHouse/AuctionHouseMgr.h
 +++ b/src/server/game/AuctionHouse/AuctionHouseMgr.h
 @@ -25,6 +25,8 @@
@@ -3546,7 +3546,7 @@ index 27ed717..039893c 100644
  class Player;
  class WorldPacket;
 diff --git a/src/server/game/CMakeLists.txt b/src/server/game/CMakeLists.txt
-index 323a3ac..c95cc4b 100644
+index be5240c..3a3f76e 100644
 --- a/src/server/game/CMakeLists.txt
 +++ b/src/server/game/CMakeLists.txt
 @@ -17,6 +17,7 @@ file(GLOB_RECURSE sources_Achievements Achievements/*.cpp Achievements/*.h)
@@ -3565,7 +3565,7 @@ index 323a3ac..c95cc4b 100644
    ${sources_Battlegrounds}
    ${sources_Calendar}
    ${sources_Chat}
-@@ -132,6 +134,7 @@ include_directories(
+@@ -134,6 +136,7 @@ include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/AI/ScriptedAI
    ${CMAKE_CURRENT_SOURCE_DIR}/AI/SmartScripts
    ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouse
@@ -3574,7 +3574,7 @@ index 323a3ac..c95cc4b 100644
    ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds/Zones
    ${CMAKE_CURRENT_SOURCE_DIR}/Calendar
 diff --git a/src/server/game/Chat/Chat.cpp b/src/server/game/Chat/Chat.cpp
-index c962a2f..59ad881 100755
+index 668da5e..9d1dc6d 100755
 --- a/src/server/game/Chat/Chat.cpp
 +++ b/src/server/game/Chat/Chat.cpp
 @@ -367,6 +367,7 @@ ChatCommand * ChatHandler::getCommandTable()
@@ -3586,7 +3586,7 @@ index c962a2f..59ad881 100755
          { "aura",           SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleAuraCommand>,                "", NULL },
          { "unaura",         SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleUnAuraCommand>,              "", NULL },
 diff --git a/src/server/game/Chat/Chat.h b/src/server/game/Chat/Chat.h
-index cd9633c..d3597b1 100755
+index cb2d923..746575e 100755
 --- a/src/server/game/Chat/Chat.h
 +++ b/src/server/game/Chat/Chat.h
 @@ -131,6 +131,7 @@ class ChatHandler
@@ -3598,7 +3598,7 @@ index cd9633c..d3597b1 100755
          bool HandleGMNameAnnounceCommand(const char* args);
          bool HandleGMAnnounceCommand(const char* args);
 diff --git a/src/server/game/Chat/Commands/Level3.cpp b/src/server/game/Chat/Commands/Level3.cpp
-index b46db40..b72ff8c 100755
+index 4043aa9..3906244 100755
 --- a/src/server/game/Chat/Commands/Level3.cpp
 +++ b/src/server/game/Chat/Commands/Level3.cpp
 @@ -62,6 +62,496 @@
@@ -4099,7 +4099,7 @@ index b46db40..b72ff8c 100755
  {
      Player* SelectedPlayer = getSelectedPlayer();
 diff --git a/src/server/game/Mails/Mail.cpp b/src/server/game/Mails/Mail.cpp
-index 2877677..7d40824 100755
+index 0956fae..e94f9fa 100755
 --- a/src/server/game/Mails/Mail.cpp
 +++ b/src/server/game/Mails/Mail.cpp
 @@ -26,6 +26,7 @@
@@ -4110,7 +4110,7 @@ index 2877677..7d40824 100755
  
  MailSender::MailSender(Object* sender, MailStationery stationery) : m_stationery(stationery)
  {
-@@ -174,6 +175,13 @@ void MailDraft::SendMailTo(SQLTransaction& trans, MailReceiver const& receiver,
+@@ -181,6 +182,13 @@ void MailDraft::SendMailTo(SQLTransaction& trans, MailReceiver const& receiver,
  
      uint32 mailId = sObjectMgr->GenerateMailID();
  
@@ -4125,7 +4125,7 @@ index 2877677..7d40824 100755
  
      //expire time if COD 3 days, if no COD 30 days, if auction sale pending 1 hour
 diff --git a/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp b/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
-index fe8dbbe..9ae9eef 100755
+index 6288fb6..4fb9863 100755
 --- a/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
 @@ -22,6 +22,7 @@
@@ -4137,7 +4137,7 @@ index fe8dbbe..9ae9eef 100755
  #include "Log.h"
  #include "Opcodes.h"
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 899c42a..09405cb 100755
+index 31ea17b..899f75a 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -71,6 +71,7 @@
@@ -4148,7 +4148,7 @@ index 899c42a..09405cb 100755
  
  volatile bool World::m_stopEvent = false;
  uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
-@@ -1706,6 +1707,9 @@ void World::SetInitialWorldSettings()
+@@ -1708,6 +1709,9 @@ void World::SetInitialWorldSettings()
      sLog->outString("Calculate random battleground reset time..." );
      InitRandomBGResetTime();
  
@@ -4158,7 +4158,7 @@ index 899c42a..09405cb 100755
      // possibly enable db logging; avoid massive startup spam by doing it here.
      if (sLog->GetLogDBLater())
      {
-@@ -1872,6 +1876,7 @@ void World::Update(uint32 diff)
+@@ -1874,6 +1878,7 @@ void World::Update(uint32 diff)
      /// <ul><li> Handle auctions when the timer has passed
      if (m_timers[WUPDATE_AUCTIONS].Passed())
      {
@@ -4167,7 +4167,7 @@ index 899c42a..09405cb 100755
  
          ///- Update mails (return old mails with item, or delete them)
 diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
-index 188d6d8..f248ed8 100644
+index 40d4631..3bda2ca 100644
 --- a/src/server/worldserver/worldserver.conf.dist
 +++ b/src/server/worldserver/worldserver.conf.dist
 @@ -2484,6 +2484,272 @@ Network.TcpNodelay = 1

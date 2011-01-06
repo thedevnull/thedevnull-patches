@@ -1,13 +1,13 @@
-From ca69b229d0b405a903cc6403c444b993243de41b Mon Sep 17 00:00:00 2001
+From 98071a50cc40eacb46b7946413d6ce341b59fe99 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 30 Dec 2010 18:52:27 -0200
-Subject: [PATCH 5/5] WinterGrasp
+Date: Thu, 6 Jan 2011 11:51:27 -0200
+Subject: [PATCH 6/6] WinterGrasp
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
  sql/Wintergrasp/Wintergrasp_world.sql              |  113 +
  src/server/game/CMakeLists.txt                     |    1 +
- src/server/game/Chat/Chat.cpp                      |   12 +
+ src/server/game/Chat/Chat.cpp                      |   13 +
  src/server/game/Chat/Chat.h                        |    7 +
  src/server/game/Chat/Commands/Level2.cpp           |  146 ++
  src/server/game/Entities/Player/Player.cpp         |    8 +
@@ -16,7 +16,8 @@ Subject: [PATCH 5/5] WinterGrasp
  src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp       |    1 +
  src/server/game/Scripting/ScriptLoader.cpp         |    4 +
  .../Protocol/Handlers/BattleGroundHandler.cpp      |   25 +
- .../Server/Protocol/Handlers/CharacterHandler.cpp  |   20 +
+ .../Server/Protocol/Handlers/CharacterHandler.cpp  |   17 +
+ .../game/Server/Protocol/Handlers/ChatHandler.cpp  |    4 +
  src/server/game/Spells/Auras/SpellAuraEffects.cpp  |    8 +
  src/server/game/Spells/Spell.cpp                   |   12 +
  src/server/game/Spells/SpellEffects.cpp            |   35 +
@@ -30,7 +31,7 @@ Subject: [PATCH 5/5] WinterGrasp
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp     | 2290 ++++++++++++++++++++
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.h       |  339 +++
  src/server/worldserver/worldserver.conf.dist       |  127 ++
- 25 files changed, 3357 insertions(+), 1 deletions(-)
+ 26 files changed, 3359 insertions(+), 1 deletions(-)
  create mode 100644 sql/Wintergrasp/Wintergrasp_world.sql
  create mode 100644 src/server/scripts/Northrend/wintergrasp.cpp
  create mode 100644 src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp
@@ -38,18 +39,18 @@ Subject: [PATCH 5/5] WinterGrasp
 
 diff --git a/sql/Wintergrasp/Wintergrasp_world.sql b/sql/Wintergrasp/Wintergrasp_world.sql
 new file mode 100644
-index 0000000..a918659
+index 0000000..fb220d1
 --- /dev/null
 +++ b/sql/Wintergrasp/Wintergrasp_world.sql
 @@ -0,0 +1,113 @@
 +DELETE FROM `trinity_string` WHERE entry IN (756,757,758,759,760,761,762,763,764,765,766,767,768,769,770,771,772,780,781);
-+REPLACE INTO `trinity_string` VALUES ('756', 'Battle begins!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва началась');
-+REPLACE INTO `trinity_string` VALUES ('757', '%s has successfully defended the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s успешно защитил(а) крепость!');
-+REPLACE INTO `trinity_string` VALUES ('758', '%s has taken over the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s захватил(а) крепость');
++REPLACE INTO `trinity_string` VALUES ('756', 'Battle begins!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Battle begins!');
++REPLACE INTO `trinity_string` VALUES ('757', '%s has successfully defended the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s has successfully defended the fortress!');
++REPLACE INTO `trinity_string` VALUES ('758', '%s has taken over the fortress!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s has taken over the fortress!');
 +REPLACE INTO `trinity_string` VALUES ('759', 'The %s siege workshop has been damaged by the %s!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('760', 'The %s siege workshop has been destroyed by the %s!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-+REPLACE INTO `trinity_string` VALUES ('761', 'The %s tower has been damaged!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s башня повреждена');
-+REPLACE INTO `trinity_string` VALUES ('762', 'The %s tower has been destroyed!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '%s башня уничтожена!');
++REPLACE INTO `trinity_string` VALUES ('761', 'The %s tower has been damaged!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The %s tower has been damaged!');
++REPLACE INTO `trinity_string` VALUES ('762', 'The %s tower has been destroyed!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The %s tower has been destroyed!');
 +REPLACE INTO `trinity_string` VALUES ('763', 'Wintergrasp fortress is under attack!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('764', 'Wintergrasp is now under the control of the %s.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('765', 'Wintergrasp timer set to %s.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
@@ -58,12 +59,12 @@ index 0000000..a918659
 +REPLACE INTO `trinity_string` VALUES ('768', 'Wintergrasp info: %s controlled. Timer: %s. Wartime: %s. Number of Players: (Horde: %u, Alliance: %u)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('769', 'Wintergrasp outdoorPvP is disabled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 +REPLACE INTO `trinity_string` VALUES ('770', 'Wintergrasp outdoorPvP is enabled.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-+REPLACE INTO `trinity_string` VALUES ('771', 'You have reached Rank 1: Corporal', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Вы достигли Ранга 1: Капрал');
-+REPLACE INTO `trinity_string` VALUES ('772', 'You have reached Rank 2: First Lieutenant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Вы достигли Ранга 2: Лейтенант');
-+REPLACE INTO `trinity_string` VALUES ('780', 'Before the Battle of  Wintergrasp left 30 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'До битвы на  Озере Ледяных Оков осталось 30 минут!');
-+REPLACE INTO `trinity_string` VALUES ('781', 'Before the Battle of  Wintergrasp left 10 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'До битвы на  Озере Ледяных Оков осталось 10 минут!');
-+REPLACE INTO `trinity_string` VALUES ('782', 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва за Озеро Ледяных Оков Остановлена. Не хватает защитников. Крепость переходит атакующей  стороне.');
-+REPLACE INTO `trinity_string` VALUES ('783', 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Битва за Озеро Ледяных Оков Остановлена. Не хватает нападающих. Крепость остается защитникам.');
++REPLACE INTO `trinity_string` VALUES ('771', 'You have reached Rank 1: Corporal', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'You have reached Rank 1: Corporal');
++REPLACE INTO `trinity_string` VALUES ('772', 'You have reached Rank 2: First Lieutenant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'You have reached Rank 2: First Lieutenant');
++REPLACE INTO `trinity_string` VALUES ('780', 'Before the Battle of  Wintergrasp left 30 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Before the Battle of  Wintergrasp left 30 minutes!');
++REPLACE INTO `trinity_string` VALUES ('781', 'Before the Battle of  Wintergrasp left 10 minutes!', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Before the Battle of  Wintergrasp left 10 minutes!');
++REPLACE INTO `trinity_string` VALUES ('782', 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The battle for Wintergrasp  has stopped! Not enough defenders. Wintergrasp Fortress remains  Attackers.');
++REPLACE INTO `trinity_string` VALUES ('783', 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'The battle for Wintergrasp  has stopped! Not enough attackers. Wintergrasp Fortress remains  Defenders.');
 +
 +DELETE FROM `command` WHERE name IN ('wg','wg enable','wg start','wg status','wg stop','wg switch','wg timer');
 +REPLACE INTO `command` VALUES ('wg', '3', 'Syntax: .wg $subcommand.');
@@ -156,10 +157,10 @@ index 0000000..a918659
 +REPLACE INTO `spell_area` VALUES (57940, 4603, 0, 0, 0, 0, 0, 2, 1);
 +REPLACE INTO `spell_area` VALUES (58045, 4197, 0, 0, 0, 0, 0, 2, 1);
 diff --git a/src/server/game/CMakeLists.txt b/src/server/game/CMakeLists.txt
-index c95cc4b..72b3bf0 100644
+index 3a3f76e..41a99b9 100644
 --- a/src/server/game/CMakeLists.txt
 +++ b/src/server/game/CMakeLists.txt
-@@ -193,6 +193,7 @@ include_directories(
+@@ -195,6 +195,7 @@ include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/Weather
    ${CMAKE_CURRENT_SOURCE_DIR}/World
    ${CMAKE_SOURCE_DIR}/src/server/scripts/PrecompiledHeaders
@@ -168,7 +169,7 @@ index c95cc4b..72b3bf0 100644
    ${MYSQL_INCLUDE_DIR}
    ${OPENSSL_INCLUDE_DIR}
 diff --git a/src/server/game/Chat/Chat.cpp b/src/server/game/Chat/Chat.cpp
-index 59ad881..74c115a 100755
+index 9d1dc6d..123733a 100755
 --- a/src/server/game/Chat/Chat.cpp
 +++ b/src/server/game/Chat/Chat.cpp
 @@ -351,6 +351,17 @@ ChatCommand * ChatHandler::getCommandTable()
@@ -189,19 +190,20 @@ index 59ad881..74c115a 100755
      static ChatCommand commandTable[] =
      {
          { "character",      SEC_GAMEMASTER,     true,  NULL,                                           "", characterCommandTable},
-@@ -438,6 +449,7 @@ ChatCommand * ChatHandler::getCommandTable()
-         { "bindsight",      SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleBindSightCommand>,           "", NULL },
-         { "unbindsight",    SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleUnbindSightCommand>,         "", NULL },
-         { "playall",        SEC_GAMEMASTER,  false, OldHandler<&ChatHandler::HandlePlayAllCommand>,             "", NULL },
-+        { "wg",             SEC_ADMINISTRATOR,  false, NULL,                                           "", wintergraspCommandTable },
+@@ -441,6 +452,8 @@ ChatCommand * ChatHandler::getCommandTable()
+         // Playerbot mod
+         { "bot",            SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandlePlayerbotCommand>,             "", NULL },
+         { "maintank",       SEC_PLAYER,  false, OldHandler<&ChatHandler::HandlePlayerbotMainTankCommand>,             "", NULL },
++		// WinterGrasp commands
++		{ "wg",             SEC_ADMINISTRATOR,  false, NULL,                                           "", wintergraspCommandTable },
          { NULL,             0,                  false, NULL,                                           "", NULL }
      };
  
 diff --git a/src/server/game/Chat/Chat.h b/src/server/game/Chat/Chat.h
-index d3597b1..b4267d1 100755
+index 746575e..db1c3ce 100755
 --- a/src/server/game/Chat/Chat.h
 +++ b/src/server/game/Chat/Chat.h
-@@ -247,6 +247,13 @@ class ChatHandler
+@@ -249,6 +249,13 @@ class ChatHandler
          bool HandleUnBanCharacterCommand(const char* args);
          bool HandleUnBanIPCommand(const char* args);
  
@@ -216,7 +218,7 @@ index d3597b1..b4267d1 100755
          bool HandleCommandsCommand(const char* args);
          bool HandleStartCommand(const char* args);
 diff --git a/src/server/game/Chat/Commands/Level2.cpp b/src/server/game/Chat/Commands/Level2.cpp
-index 9071469..037d7c4 100755
+index 00962a9..082678d 100755
 --- a/src/server/game/Chat/Commands/Level2.cpp
 +++ b/src/server/game/Chat/Commands/Level2.cpp
 @@ -39,6 +39,7 @@
@@ -380,7 +382,7 @@ index 9071469..037d7c4 100755
  {
      if (!*args)
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 4807540..d4dd7d1 100755
+index 7a5552e..967ab65 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -55,6 +55,7 @@
@@ -391,7 +393,7 @@ index 4807540..d4dd7d1 100755
  #include "ArenaTeam.h"
  #include "Chat.h"
  #include "Spell.h"
-@@ -8780,6 +8781,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
+@@ -10022,6 +10023,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
      data << uint32(0x8d3) << uint32(0x0);                   // 6
                                                              // 7 1 - Arena season in progress, 0 - end of season
      data << uint32(0xC77) << uint32(sWorld->getBoolConfig(CONFIG_ARENA_SEASON_IN_PROGRESS));
@@ -406,7 +408,7 @@ index 4807540..d4dd7d1 100755
      data << uint32(0xF3D) << uint32(sWorld->getIntConfig(CONFIG_ARENA_SEASON_ID));
  
 diff --git a/src/server/game/Miscellaneous/Language.h b/src/server/game/Miscellaneous/Language.h
-index 628ea16..26a1c3d 100755
+index 4afb315..a2da8ee 100755
 --- a/src/server/game/Miscellaneous/Language.h
 +++ b/src/server/game/Miscellaneous/Language.h
 @@ -702,6 +702,29 @@ enum TrinityStrings
@@ -440,7 +442,7 @@ index 628ea16..26a1c3d 100755
      LANG_ARENA_TESTING                  = 785,
      LANG_AUTO_ANN                       = 786,
 diff --git a/src/server/game/OutdoorPvP/OutdoorPvP.h b/src/server/game/OutdoorPvP/OutdoorPvP.h
-index 406f5ec..9a19d64 100755
+index 1da710a..96666d1 100755
 --- a/src/server/game/OutdoorPvP/OutdoorPvP.h
 +++ b/src/server/game/OutdoorPvP/OutdoorPvP.h
 @@ -32,9 +32,10 @@ enum OutdoorPvPTypes
@@ -456,7 +458,7 @@ index 406f5ec..9a19d64 100755
  const uint8 CapturePointArtKit[3] = {2, 1, 21};
  
 diff --git a/src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp b/src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp
-index 9e82b6d..c675e5f 100755
+index 4ccc31a..d91366c 100755
 --- a/src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp
 +++ b/src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp
 @@ -16,6 +16,7 @@
@@ -468,10 +470,10 @@ index 9e82b6d..c675e5f 100755
  #include "Player.h"
  #include "DisableMgr.h"
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index aca56ef..69df756 100755
+index 1ec4038..cdb453b 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
-@@ -569,6 +569,7 @@ void AddSC_shadowmoon_valley();
+@@ -581,6 +581,7 @@ void AddSC_shadowmoon_valley();
  void AddSC_shattrath_city();
  void AddSC_terokkar_forest();
  void AddSC_zangarmarsh();
@@ -479,7 +481,7 @@ index aca56ef..69df756 100755
  
  // battlegrounds
  
-@@ -579,6 +580,7 @@ void AddSC_outdoorpvp_na();
+@@ -591,6 +592,7 @@ void AddSC_outdoorpvp_na();
  void AddSC_outdoorpvp_si();
  void AddSC_outdoorpvp_tf();
  void AddSC_outdoorpvp_zm();
@@ -487,7 +489,7 @@ index aca56ef..69df756 100755
  
  // player
  void AddSC_chat_log();
-@@ -1173,6 +1175,7 @@ void AddNorthrendScripts()
+@@ -1196,6 +1198,7 @@ void AddNorthrendScripts()
      AddSC_storm_peaks();
      AddSC_zuldrak();
      AddSC_crystalsong_forest();
@@ -495,7 +497,7 @@ index aca56ef..69df756 100755
  #endif
  }
  
-@@ -1185,6 +1188,7 @@ void AddOutdoorPvPScripts()
+@@ -1208,6 +1211,7 @@ void AddOutdoorPvPScripts()
      AddSC_outdoorpvp_si();
      AddSC_outdoorpvp_tf();
      AddSC_outdoorpvp_zm();
@@ -504,7 +506,7 @@ index aca56ef..69df756 100755
  }
  
 diff --git a/src/server/game/Server/Protocol/Handlers/BattleGroundHandler.cpp b/src/server/game/Server/Protocol/Handlers/BattleGroundHandler.cpp
-index 63e9a6f..3114b38 100755
+index 0641007..c0d02fc 100755
 --- a/src/server/game/Server/Protocol/Handlers/BattleGroundHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/BattleGroundHandler.cpp
 @@ -35,6 +35,9 @@
@@ -556,20 +558,10 @@ index 63e9a6f..3114b38 100755
  
  
 diff --git a/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp b/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
-index a07756f..e458bde 100755
+index 57fd279..ef065ee 100755
 --- a/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/CharacterHandler.cpp
-@@ -41,6 +41,9 @@
- #include "ScriptMgr.h"
- #include "Battleground.h"
- 
-+#include "OutdoorPvPWG.h"
-+#include "OutdoorPvPMgr.h"
-+
- class LoginQueryHolder : public SQLQueryHolder
- {
-     private:
-@@ -801,6 +804,23 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
+@@ -833,6 +833,23 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder * holder)
      sObjectAccessor->AddObject(pCurrChar);
      //sLog->outDebug("Player %s added to Map.",pCurrChar->GetName());
  
@@ -593,8 +585,23 @@ index a07756f..e458bde 100755
      pCurrChar->SendInitialPacketsAfterAddToMap();
  
      CharacterDatabase.PExecute("UPDATE characters SET online = 1 WHERE guid = '%u'", pCurrChar->GetGUIDLow());
+diff --git a/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp b/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
+index 27e4d5d..7e20cfa 100755
+--- a/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
++++ b/src/server/game/Server/Protocol/Handlers/ChatHandler.cpp
+@@ -42,6 +42,10 @@
+ //Playerbot mod
+ #include "PlayerbotAI.h"
+ 
++//WinterGrasp
++#include "OutdoorPvPWG.h"
++#include "OutdoorPvPMgr.h"
++
+ 
+ 
+ 
 diff --git a/src/server/game/Spells/Auras/SpellAuraEffects.cpp b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-index 6cdf410..97eb61f 100755
+index 7ba40a1..d410d6c 100755
 --- a/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 +++ b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 @@ -30,6 +30,7 @@
@@ -605,7 +612,7 @@ index 6cdf410..97eb61f 100755
  #include "Formulas.h"
  #include "GridNotifiers.h"
  #include "GridNotifiersImpl.h"
-@@ -5880,6 +5881,13 @@ void AuraEffect::HandleAuraDummy(AuraApplication const * aurApp, uint8 mode, boo
+@@ -5894,6 +5895,13 @@ void AuraEffect::HandleAuraDummy(AuraApplication const * aurApp, uint8 mode, boo
                              if (aurApp->GetRemoveMode() == AURA_REMOVE_BY_EXPIRE)
                                  target->CastSpell(target, 58601, true);
                              break;
@@ -620,7 +627,7 @@ index 6cdf410..97eb61f 100755
                      break;
                  case SPELLFAMILY_MAGE:
 diff --git a/src/server/game/Spells/Spell.cpp b/src/server/game/Spells/Spell.cpp
-index 51498ff..16e3b54 100755
+index c3076ae..fd91510 100755
 --- a/src/server/game/Spells/Spell.cpp
 +++ b/src/server/game/Spells/Spell.cpp
 @@ -51,6 +51,8 @@
@@ -659,7 +666,7 @@ index 51498ff..16e3b54 100755
                  break;
              }
 diff --git a/src/server/game/Spells/SpellEffects.cpp b/src/server/game/Spells/SpellEffects.cpp
-index 4213239..565df1d 100755
+index 4535b3c..dd12ef9 100755
 --- a/src/server/game/Spells/SpellEffects.cpp
 +++ b/src/server/game/Spells/SpellEffects.cpp
 @@ -48,6 +48,7 @@
@@ -670,7 +677,7 @@ index 4213239..565df1d 100755
  #include "Language.h"
  #include "SocialMgr.h"
  #include "Util.h"
-@@ -4317,6 +4318,25 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
+@@ -4321,6 +4322,25 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
          {
              switch(m_spellInfo->Id)
              {
@@ -696,7 +703,7 @@ index 4213239..565df1d 100755
                  // Glyph of Backstab
                  case 63975:
                  {
-@@ -6989,9 +7009,24 @@ void Spell::EffectPlayerNotification(SpellEffIndex /*effIndex*/)
+@@ -6993,9 +7013,24 @@ void Spell::EffectPlayerNotification(SpellEffIndex /*effIndex*/)
      if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
          return;
  
@@ -722,7 +729,7 @@ index 4213239..565df1d 100755
              unitTarget->ToPlayer()->GetSession()->SendNotification(LANG_ZONE_NOFLYZONE);
              break;
 diff --git a/src/server/game/Spells/SpellMgr.cpp b/src/server/game/Spells/SpellMgr.cpp
-index db34245..f4e49d2 100755
+index e7d0682..de2ef22 100755
 --- a/src/server/game/Spells/SpellMgr.cpp
 +++ b/src/server/game/Spells/SpellMgr.cpp
 @@ -27,6 +27,8 @@
@@ -774,7 +781,7 @@ index db34245..f4e49d2 100755
      }
  
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 2dcd290..66fe14c 100755
+index 6f0edaf..19e82a7 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -48,6 +48,7 @@
@@ -785,7 +792,7 @@ index 2dcd290..66fe14c 100755
  #include "TemporarySummon.h"
  #include "WaypointMovementGenerator.h"
  #include "VMapFactory.h"
-@@ -1160,6 +1161,22 @@ void World::LoadConfigSettings(bool reload)
+@@ -1162,6 +1163,22 @@ void World::LoadConfigSettings(bool reload)
      if (m_int_configs[CONFIG_PVP_TOKEN_COUNT] < 1)
          m_int_configs[CONFIG_PVP_TOKEN_COUNT] = 1;
  
@@ -808,7 +815,7 @@ index 2dcd290..66fe14c 100755
      m_bool_configs[CONFIG_NO_RESET_TALENT_COST] = sConfig->GetBoolDefault("NoResetTalentsCost", false);
      m_bool_configs[CONFIG_SHOW_KICK_IN_WORLD] = sConfig->GetBoolDefault("ShowKickInWorld", false);
      m_int_configs[CONFIG_INTERVAL_LOG_UPDATE] = sConfig->GetIntDefault("RecordUpdateTimeDiffInterval", 60000);
-@@ -2827,3 +2844,29 @@ void World::ProcessQueryCallbacks()
+@@ -2829,3 +2846,29 @@ void World::ProcessQueryCallbacks()
          m_realmCharCallback.FreeResult();
      }
  }
@@ -840,10 +847,10 @@ index 2dcd290..66fe14c 100755
 +}
 \ No newline at end of file
 diff --git a/src/server/game/World/World.h b/src/server/game/World/World.h
-index a379acf..9c80b3d 100755
+index a612fb9..7a986b2 100755
 --- a/src/server/game/World/World.h
 +++ b/src/server/game/World/World.h
-@@ -160,6 +160,9 @@ enum WorldBoolConfigs
+@@ -161,6 +161,9 @@ enum WorldBoolConfigs
      CONFIG_CHATLOG_BGROUND,
      CONFIG_DUNGEON_FINDER_ENABLE,
      CONFIG_AUTOBROADCAST,
@@ -853,7 +860,7 @@ index a379acf..9c80b3d 100755
      CONFIG_ALLOW_TICKETS,
      CONFIG_DBC_ENFORCE_ITEM_ATTRIBUTES,
      CONFIG_PRESERVE_CUSTOM_CHANNELS,
-@@ -307,6 +310,18 @@ enum WorldIntConfigs
+@@ -308,6 +311,18 @@ enum WorldIntConfigs
      CONFIG_AUTOBROADCAST_INTERVAL,
      CONFIG_MAX_RESULTS_LOOKUP_COMMANDS,
      CONFIG_DB_PING_INTERVAL,
@@ -872,7 +879,7 @@ index a379acf..9c80b3d 100755
      CONFIG_PRESERVE_CUSTOM_CHANNEL_DURATION,
      CONFIG_PERSISTENT_CHARACTER_CLEAN_FLAGS,
      INT_CONFIG_VALUE_COUNT
-@@ -525,6 +540,7 @@ class World
+@@ -526,6 +541,7 @@ class World
          ~World();
  
          WorldSession* FindSession(uint32 id) const;
@@ -880,7 +887,7 @@ index a379acf..9c80b3d 100755
          void AddSession(WorldSession *s);
          void SendAutoBroadcast();
          bool RemoveSession(uint32 id);
-@@ -725,6 +741,18 @@ class World
+@@ -726,6 +742,18 @@ class World
          inline uint16 GetMvAnticheatIgnoreAfterTeleport()   {return m_MvAnticheatIgnoreAfterTeleport;}
  
  
@@ -900,10 +907,10 @@ index a379acf..9c80b3d 100755
          void QueueCliCommand(CliCommandHolder* commandHolder) { cliCmdQueue.add(commandHolder); }
  
 diff --git a/src/server/scripts/CMakeLists.txt b/src/server/scripts/CMakeLists.txt
-index 90eae34..092a461 100644
+index ef7619a..d917ab8 100644
 --- a/src/server/scripts/CMakeLists.txt
 +++ b/src/server/scripts/CMakeLists.txt
-@@ -127,6 +127,7 @@ include_directories(
+@@ -128,6 +128,7 @@ include_directories(
    ${CMAKE_SOURCE_DIR}/src/server/game/Movement/Waypoints
    ${CMAKE_SOURCE_DIR}/src/server/game/Opcodes
    ${CMAKE_SOURCE_DIR}/src/server/game/OutdoorPvP
@@ -3676,7 +3683,7 @@ index 0000000..d3136ad
 +#endif
 \ No newline at end of file
 diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
-index 1b40dcf..29830d7 100644
+index 52ce654..d774c6b 100644
 --- a/src/server/worldserver/worldserver.conf.dist
 +++ b/src/server/worldserver/worldserver.conf.dist
 @@ -1376,6 +1376,133 @@ DBC.EnforceItemAttributes = 1

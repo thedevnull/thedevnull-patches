@@ -1,7 +1,7 @@
-From 466adc9d15834192a5e3179f149e295fb7fe56cd Mon Sep 17 00:00:00 2001
+From 62b210bee401c31b7b7caf0f1e46057353895354 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 30 Dec 2010 18:50:33 -0200
-Subject: [PATCH 3/5] AC1
+Date: Thu, 6 Jan 2011 11:45:34 -0200
+Subject: [PATCH 4/6] AC1
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -120,10 +120,10 @@ index 0000000..0cf9c73
 +
 +ALTER TABLE `cheaters` DROP COLUMN `Pos`;
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index de2f5d1..4807540 100755
+index 97b5b0a..7a5552e 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
-@@ -520,6 +520,17 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
+@@ -528,6 +528,17 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
      rest_type=REST_TYPE_NO;
      ////////////////////Rest System/////////////////////
  
@@ -141,7 +141,7 @@ index de2f5d1..4807540 100755
      m_mailsLoaded = false;
      m_mailsUpdated = false;
      unReadMails = 0;
-@@ -23174,7 +23185,9 @@ uint8 Player::CanEquipUniqueItem(ItemPrototype const* itemProto, uint8 except_sl
+@@ -24445,7 +24456,9 @@ uint8 Player::CanEquipUniqueItem(ItemPrototype const* itemProto, uint8 except_sl
  void Player::HandleFall(MovementInfo const& movementInfo)
  {
      // calculate total z distance of the fall
@@ -153,10 +153,10 @@ index de2f5d1..4807540 100755
  
      //Players with low fall distance, Feather Fall or physical immunity (charges used) are ignored
 diff --git a/src/server/game/Entities/Player/Player.h b/src/server/game/Entities/Player/Player.h
-index d1f217d..ed55f25 100755
+index 48c4ac8..ccb505e 100755
 --- a/src/server/game/Entities/Player/Player.h
 +++ b/src/server/game/Entities/Player/Player.h
-@@ -995,6 +995,21 @@ class Player : public Unit, public GridObject<Player>
+@@ -996,6 +996,21 @@ class Player : public Unit, public GridObject<Player>
          explicit Player (WorldSession *session);
          ~Player ();
  
@@ -179,7 +179,7 @@ index d1f217d..ed55f25 100755
  
          static UpdateMask updateVisualBits;
 diff --git a/src/server/game/Movement/MovementGenerators/WaypointMovementGenerator.cpp b/src/server/game/Movement/MovementGenerators/WaypointMovementGenerator.cpp
-index c5b5e4e..1204110 100755
+index efae233..034fa00 100755
 --- a/src/server/game/Movement/MovementGenerators/WaypointMovementGenerator.cpp
 +++ b/src/server/game/Movement/MovementGenerators/WaypointMovementGenerator.cpp
 @@ -266,6 +266,7 @@ void FlightPathMovementGenerator::Finalize(Player & player)
@@ -191,7 +191,7 @@ index c5b5e4e..1204110 100755
  
  }
 diff --git a/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp b/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
-index 08828f5..a6023f3 100755
+index e138301..26322c4 100755
 --- a/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
 @@ -24,13 +24,225 @@
@@ -611,10 +611,10 @@ index 08828f5..a6023f3 100755
      /* process position-change */
      WorldPacket data(opcode, recv_data.size());
 diff --git a/src/server/game/Server/WorldSession.h b/src/server/game/Server/WorldSession.h
-index 3a631ac..20eeaaf 100755
+index a9dae24..b2ab540 100755
 --- a/src/server/game/Server/WorldSession.h
 +++ b/src/server/game/Server/WorldSession.h
-@@ -187,6 +187,10 @@ class WorldSession
+@@ -198,6 +198,10 @@ class WorldSession
          bool PlayerLogout() const { return m_playerLogout; }
          bool PlayerLogoutWithSave() const { return m_playerLogout && m_playerSave; }
  
@@ -626,10 +626,10 @@ index 3a631ac..20eeaaf 100755
  
          void ReadAddonsInfo(WorldPacket &data);
 diff --git a/src/server/game/Spells/Auras/SpellAuraEffects.cpp b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-index 3afd452..6cdf410 100755
+index ffb5d16..7ba40a1 100755
 --- a/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 +++ b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-@@ -3892,9 +3892,15 @@ void AuraEffect::HandleAuraAllowFlight(AuraApplication const * aurApp, uint8 mod
+@@ -3887,9 +3887,15 @@ void AuraEffect::HandleAuraAllowFlight(AuraApplication const * aurApp, uint8 mod
          // allow fly
          WorldPacket data;
          if (apply)
@@ -645,7 +645,7 @@ index 3afd452..6cdf410 100755
          data.append(target->GetPackGUID());
          data << uint32(0);                                      // unk
          plr->SendDirectMessage(&data);
-@@ -4295,9 +4301,15 @@ void AuraEffect::HandleAuraModIncreaseFlightSpeed(AuraApplication const * aurApp
+@@ -4290,9 +4296,15 @@ void AuraEffect::HandleAuraModIncreaseFlightSpeed(AuraApplication const * aurApp
              {
                  WorldPacket data;
                  if (apply)
@@ -662,7 +662,7 @@ index 3afd452..6cdf410 100755
                  data << uint32(0);                                      // unknown
                  plr->SendDirectMessage(&data);
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 09405cb..2dcd290 100755
+index 899f75a..6f0edaf 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -563,7 +563,19 @@ void World::LoadConfigSettings(bool reload)
@@ -687,10 +687,10 @@ index 09405cb..2dcd290 100755
      {
          sLog->outError("Compression level (%i) must be in range 1..9. Using default compression level (1).",m_int_configs[CONFIG_COMPRESSION]);
 diff --git a/src/server/game/World/World.h b/src/server/game/World/World.h
-index 6e5b639..a379acf 100755
+index 3bf4599..a612fb9 100755
 --- a/src/server/game/World/World.h
 +++ b/src/server/game/World/World.h
-@@ -712,6 +712,19 @@ class World
+@@ -713,6 +713,19 @@ class World
          static int32 GetVisibilityNotifyPeriodInInstances() { return m_visibility_notify_periodInInstances;  }
          static int32 GetVisibilityNotifyPeriodInBGArenas()  { return m_visibility_notify_periodInBGArenas;   }
  
@@ -710,7 +710,7 @@ index 6e5b639..a379acf 100755
          void ProcessCliCommands();
          void QueueCliCommand(CliCommandHolder* commandHolder) { cliCmdQueue.add(commandHolder); }
  
-@@ -808,6 +821,19 @@ class World
+@@ -809,6 +822,19 @@ class World
          static int32 m_visibility_notify_periodInInstances;
          static int32 m_visibility_notify_periodInBGArenas;
  
@@ -731,7 +731,7 @@ index 6e5b639..a379acf 100755
          ACE_Based::LockedQueue<CliCommandHolder*,ACE_Thread_Mutex> cliCmdQueue;
  
 diff --git a/src/server/scripts/Commands/cs_gm.cpp b/src/server/scripts/Commands/cs_gm.cpp
-index 8e3c815..be2f2f9 100644
+index 1ed451e..fa1f7fa 100644
 --- a/src/server/scripts/Commands/cs_gm.cpp
 +++ b/src/server/scripts/Commands/cs_gm.cpp
 @@ -95,9 +95,15 @@ public:
@@ -751,7 +751,7 @@ index 8e3c815..be2f2f9 100644
          {
              handler->SendSysMessage(LANG_USE_BOL);
 diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
-index cdaa2b0..1b40dcf 100644
+index bd5b4e9..52ce654 100644
 --- a/src/server/worldserver/worldserver.conf.dist
 +++ b/src/server/worldserver/worldserver.conf.dist
 @@ -2862,6 +2862,88 @@ CharDelete.KeepDays = 30

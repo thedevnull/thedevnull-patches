@@ -1,7 +1,7 @@
-From 73213abc2d7e93d3a25ccf1f2361985981b6af63 Mon Sep 17 00:00:00 2001
+From f672cf49a811233a91d225f176e2b4f944d84fec Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 30 Dec 2010 18:49:02 -0200
-Subject: [PATCH 2/5] Auction House Bot Mod for Glyphs
+Date: Thu, 6 Jan 2011 11:44:44 -0200
+Subject: [PATCH 3/6] Ahbot Glyphs
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -272,7 +272,7 @@ index 6c3cf82..a7da388 100644
  
      AHBConfig AllianceConfig;
 diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
-index f248ed8..cdaa2b0 100644
+index 3bda2ca..bd5b4e9 100644
 --- a/src/server/worldserver/worldserver.conf.dist
 +++ b/src/server/worldserver/worldserver.conf.dist
 @@ -2750,6 +2750,23 @@ AuctionHouseBot.DisableItemsAboveReqSkillRank = 0

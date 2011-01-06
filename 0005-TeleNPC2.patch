@@ -1,7 +1,7 @@
-From 777efc7ddb92a3df9f3822d45bd5760907880eb5 Mon Sep 17 00:00:00 2001
+From 6122511baf36019755d83b425523ee2fabba805f Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 30 Dec 2010 18:51:51 -0200
-Subject: [PATCH 4/5] TeleNPC2
+Date: Thu, 6 Jan 2011 11:46:07 -0200
+Subject: [PATCH 5/6] TeleNPC2
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -702,7 +702,7 @@ index 0000000..4830245
 +
 +#endif
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index ec534b6..aca56ef 100755
+index 3e97cb3..1ec4038 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
 @@ -25,6 +25,9 @@ void AddSC_example_gossip_codebox();
@@ -715,7 +715,7 @@ index ec534b6..aca56ef 100755
  // spells
  void AddSC_deathknight_spell_scripts();
  void AddSC_druid_spell_scripts();
-@@ -1200,6 +1203,7 @@ void AddCustomScripts()
+@@ -1223,6 +1226,7 @@ void AddCustomScripts()
  {
  #ifdef SCRIPTS
      /* This is where custom scripts should be added. */
@@ -725,7 +725,7 @@ index ec534b6..aca56ef 100755
  #endif
  }
 diff --git a/src/server/game/Scripting/ScriptMgr.cpp b/src/server/game/Scripting/ScriptMgr.cpp
-index 8ac9e28..4d151e8 100755
+index 5cb3dd6..7ead67e 100755
 --- a/src/server/game/Scripting/ScriptMgr.cpp
 +++ b/src/server/game/Scripting/ScriptMgr.cpp
 @@ -25,6 +25,7 @@
@@ -746,7 +746,7 @@ index 8ac9e28..4d151e8 100755
      sLog->outString("Loading C++ scripts");
      
 diff --git a/src/server/scripts/CMakeLists.txt b/src/server/scripts/CMakeLists.txt
-index 17d4bfc..90eae34 100644
+index 95ec7b9..ef7619a 100644
 --- a/src/server/scripts/CMakeLists.txt
 +++ b/src/server/scripts/CMakeLists.txt
 @@ -31,6 +31,9 @@ include(Examples/CMakeLists.txt)
