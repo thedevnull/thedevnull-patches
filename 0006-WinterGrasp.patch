@@ -1,7 +1,7 @@
-From a4be55c049d3875adf3f5f444f6f7264babfc450 Mon Sep 17 00:00:00 2001
+From f2a71c6c7a3344e3db1baefffa76a40bd48b129e Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 6 Jan 2011 17:44:27 -0200
-Subject: [PATCH 6/6] WinterGrasp
+Date: Mon, 10 Jan 2011 11:19:14 -0200
+Subject: [PATCH 6/6] Wintergrasp
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -14,13 +14,13 @@ Subject: [PATCH 6/6] WinterGrasp
  src/server/game/Miscellaneous/Language.h           |   23 +
  src/server/game/OutdoorPvP/OutdoorPvP.h            |    3 +-
  src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp       |    1 +
- src/server/game/Scripting/ScriptLoader.cpp         |    4 +
+ src/server/game/Scripting/ScriptLoader.cpp         |    3 +
  .../Protocol/Handlers/BattleGroundHandler.cpp      |   25 +
  .../Server/Protocol/Handlers/CharacterHandler.cpp  |   20 +
  src/server/game/Spells/Auras/SpellAuraEffects.cpp  |    8 +
  src/server/game/Spells/Spell.cpp                   |   12 +
  src/server/game/Spells/SpellEffects.cpp            |   35 +
- src/server/game/Spells/SpellMgr.cpp                |   20 +
+ src/server/game/Spells/SpellMgr.cpp                |    2 +
  src/server/game/World/World.cpp                    |   43 +
  src/server/game/World/World.h                      |   28 +
  src/server/scripts/CMakeLists.txt                  |    1 +
@@ -30,7 +30,7 @@ Subject: [PATCH 6/6] WinterGrasp
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp     | 2290 ++++++++++++++++++++
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.h       |  339 +++
  src/server/worldserver/worldserver.conf.dist       |  127 ++
- 25 files changed, 3357 insertions(+), 1 deletions(-)
+ 25 files changed, 3338 insertions(+), 1 deletions(-)
  create mode 100644 sql/Wintergrasp/Wintergrasp_world.sql
  create mode 100644 src/server/scripts/Northrend/wintergrasp.cpp
  create mode 100644 src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp
@@ -380,7 +380,7 @@ index 00962a9..082678d 100755
  {
      if (!*args)
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 7a5552e..967ab65 100755
+index 5b02000..65b21b3 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -55,6 +55,7 @@
@@ -391,7 +391,7 @@ index 7a5552e..967ab65 100755
  #include "ArenaTeam.h"
  #include "Chat.h"
  #include "Spell.h"
-@@ -10022,6 +10023,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
+@@ -10033,6 +10034,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
      data << uint32(0x8d3) << uint32(0x0);                   // 6
                                                              // 7 1 - Arena season in progress, 0 - end of season
      data << uint32(0xC77) << uint32(sWorld->getBoolConfig(CONFIG_ARENA_SEASON_IN_PROGRESS));
@@ -406,7 +406,7 @@ index 7a5552e..967ab65 100755
      data << uint32(0xF3D) << uint32(sWorld->getIntConfig(CONFIG_ARENA_SEASON_ID));
  
 diff --git a/src/server/game/Miscellaneous/Language.h b/src/server/game/Miscellaneous/Language.h
-index 4afb315..a2da8ee 100755
+index 24c4114..1b00629 100755
 --- a/src/server/game/Miscellaneous/Language.h
 +++ b/src/server/game/Miscellaneous/Language.h
 @@ -702,6 +702,29 @@ enum TrinityStrings
@@ -468,10 +468,10 @@ index 4ccc31a..d91366c 100755
  #include "Player.h"
  #include "DisableMgr.h"
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index 1ec4038..cdb453b 100755
+index 3d5fac7..5307d5b 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
-@@ -581,6 +581,7 @@ void AddSC_shadowmoon_valley();
+@@ -582,6 +582,7 @@ void AddSC_shadowmoon_valley();
  void AddSC_shattrath_city();
  void AddSC_terokkar_forest();
  void AddSC_zangarmarsh();
@@ -479,7 +479,7 @@ index 1ec4038..cdb453b 100755
  
  // battlegrounds
  
-@@ -591,6 +592,7 @@ void AddSC_outdoorpvp_na();
+@@ -592,6 +593,7 @@ void AddSC_outdoorpvp_na();
  void AddSC_outdoorpvp_si();
  void AddSC_outdoorpvp_tf();
  void AddSC_outdoorpvp_zm();
@@ -487,15 +487,7 @@ index 1ec4038..cdb453b 100755
  
  // player
  void AddSC_chat_log();
-@@ -1196,6 +1198,7 @@ void AddNorthrendScripts()
-     AddSC_storm_peaks();
-     AddSC_zuldrak();
-     AddSC_crystalsong_forest();
-+    AddSC_wintergrasp();
- #endif
- }
- 
-@@ -1208,6 +1211,7 @@ void AddOutdoorPvPScripts()
+@@ -1210,6 +1212,7 @@ void AddOutdoorPvPScripts()
      AddSC_outdoorpvp_si();
      AddSC_outdoorpvp_tf();
      AddSC_outdoorpvp_zm();
@@ -594,7 +586,7 @@ index 57fd279..4f539be 100755
  
      CharacterDatabase.PExecute("UPDATE characters SET online = 1 WHERE guid = '%u'", pCurrChar->GetGUIDLow());
 diff --git a/src/server/game/Spells/Auras/SpellAuraEffects.cpp b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-index 7ba40a1..d410d6c 100755
+index 55c99fc..c45c3e0 100755
 --- a/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 +++ b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 @@ -30,6 +30,7 @@
@@ -605,7 +597,7 @@ index 7ba40a1..d410d6c 100755
  #include "Formulas.h"
  #include "GridNotifiers.h"
  #include "GridNotifiersImpl.h"
-@@ -5894,6 +5895,13 @@ void AuraEffect::HandleAuraDummy(AuraApplication const * aurApp, uint8 mode, boo
+@@ -5918,6 +5919,13 @@ void AuraEffect::HandleAuraDummy(AuraApplication const * aurApp, uint8 mode, boo
                              if (aurApp->GetRemoveMode() == AURA_REMOVE_BY_EXPIRE)
                                  target->CastSpell(target, 58601, true);
                              break;
@@ -620,7 +612,7 @@ index 7ba40a1..d410d6c 100755
                      break;
                  case SPELLFAMILY_MAGE:
 diff --git a/src/server/game/Spells/Spell.cpp b/src/server/game/Spells/Spell.cpp
-index c3076ae..fd91510 100755
+index 819ec8e..c70d7f8 100755
 --- a/src/server/game/Spells/Spell.cpp
 +++ b/src/server/game/Spells/Spell.cpp
 @@ -51,6 +51,8 @@
@@ -632,7 +624,7 @@ index c3076ae..fd91510 100755
  
  #define SPELL_CHANNEL_UPDATE_INTERVAL (1 * IN_MILLISECONDS)
  
-@@ -4747,6 +4749,8 @@ void Spell::HandleEffects(Unit *pUnitTarget,Item *pItemTarget,GameObject *pGOTar
+@@ -4759,6 +4761,8 @@ void Spell::HandleEffects(Unit *pUnitTarget,Item *pItemTarget,GameObject *pGOTar
  
  SpellCastResult Spell::CheckCast(bool strict)
  {
@@ -641,7 +633,7 @@ index c3076ae..fd91510 100755
      // check death state
      if (!m_IsTriggeredSpell && !m_caster->isAlive() && !(m_spellInfo->Attributes & SPELL_ATTR0_PASSIVE) && !(m_spellInfo->Attributes & SPELL_ATTR0_CASTABLE_WHILE_DEAD))
          return SPELL_FAILED_CASTER_DEAD;
-@@ -5605,8 +5609,16 @@ SpellCastResult Spell::CheckCast(bool strict)
+@@ -5617,8 +5621,16 @@ SpellCastResult Spell::CheckCast(bool strict)
                  if (m_originalCaster && m_originalCaster->GetTypeId() == TYPEID_PLAYER && m_originalCaster->isAlive())
                  {
                      if (AreaTableEntry const* pArea = GetAreaEntryByAreaID(m_originalCaster->GetAreaId()))
@@ -659,7 +651,7 @@ index c3076ae..fd91510 100755
                  break;
              }
 diff --git a/src/server/game/Spells/SpellEffects.cpp b/src/server/game/Spells/SpellEffects.cpp
-index 4535b3c..dd12ef9 100755
+index 601195a..fd2fe6d 100755
 --- a/src/server/game/Spells/SpellEffects.cpp
 +++ b/src/server/game/Spells/SpellEffects.cpp
 @@ -48,6 +48,7 @@
@@ -670,7 +662,7 @@ index 4535b3c..dd12ef9 100755
  #include "Language.h"
  #include "SocialMgr.h"
  #include "Util.h"
-@@ -4321,6 +4322,25 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
+@@ -4379,6 +4380,25 @@ void Spell::EffectScriptEffect(SpellEffIndex effIndex)
          {
              switch(m_spellInfo->Id)
              {
@@ -696,7 +688,7 @@ index 4535b3c..dd12ef9 100755
                  // Glyph of Backstab
                  case 63975:
                  {
-@@ -6993,9 +7013,24 @@ void Spell::EffectPlayerNotification(SpellEffIndex /*effIndex*/)
+@@ -7051,9 +7071,24 @@ void Spell::EffectPlayerNotification(SpellEffIndex /*effIndex*/)
      if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
          return;
  
@@ -722,19 +714,10 @@ index 4535b3c..dd12ef9 100755
              unitTarget->ToPlayer()->GetSession()->SendNotification(LANG_ZONE_NOFLYZONE);
              break;
 diff --git a/src/server/game/Spells/SpellMgr.cpp b/src/server/game/Spells/SpellMgr.cpp
-index e7d0682..de2ef22 100755
+index c736e3e..4b34040 100755
 --- a/src/server/game/Spells/SpellMgr.cpp
 +++ b/src/server/game/Spells/SpellMgr.cpp
-@@ -27,6 +27,8 @@
- #include "BattlegroundMgr.h"
- #include "CreatureAI.h"
- #include "MapManager.h"
-+#include "OutdoorPvPMgr.h"
-+#include "OutdoorPvPWG.h"
- 
- bool IsAreaEffectTarget[TOTAL_SPELL_TARGETS];
- SpellEffectTargetTypes EffectTargetType[TOTAL_SPELL_EFFECTS];
-@@ -3056,6 +3058,8 @@ bool IsPartOfSkillLine(uint32 skillId, uint32 spellId)
+@@ -3057,6 +3057,8 @@ bool IsPartOfSkillLine(uint32 skillId, uint32 spellId)
  
  bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32 newArea) const
  {
@@ -743,36 +726,6 @@ index e7d0682..de2ef22 100755
      if (gender != GENDER_NONE)                   // not in expected gender
          if (!player || gender != player->getGender())
              return false;
-@@ -3084,6 +3088,7 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
-     switch(spellId)
-     {
-         case 58600: // No fly Zone - Dalaran
-+			{
-             if (!player)
-                 return false;
- 
-@@ -3092,6 +3097,21 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
-                 return false;
-             if (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY))
-                 return false;
-+			}
-+            break;
-+        case 58730: // No fly Zone - Wintergrasp
-+			{
-+				if (sWorld->getBoolConfig(CONFIG_OUTDOORPVP_WINTERGRASP_ENABLED))
-+				{
-+				  if ((pvpWG->isWarTime()==false) || !player || (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY)) || player->HasAura(45472) || player->HasAura(44795) || player->GetPositionZ())
-+				    return false;
-+				}
-+			}
-+            break;
-+        case 58045: // Essence of Wintergrasp - Wintergrasp
-+        case 57940: // Essence of Wintergrasp - Northrend
-+             if (!player || player->GetTeamId() != sWorld->getWorldState(WORLDSTATE_WINTERGRASP_CONTROLING_FACTION))
-+             return false;
-             break;
-     }
- 
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
 index 6f0edaf..19e82a7 100755
 --- a/src/server/game/World/World.cpp
@@ -912,10 +865,10 @@ index ef7619a..d917ab8 100644
    ${CMAKE_SOURCE_DIR}/src/server/game/PrecompiledHeaders
    ${CMAKE_SOURCE_DIR}/src/server/game/Quests
 diff --git a/src/server/scripts/Northrend/CMakeLists.txt b/src/server/scripts/Northrend/CMakeLists.txt
-index cad7688..4e60b45 100644
+index f1c80b1..6790e85 100644
 --- a/src/server/scripts/Northrend/CMakeLists.txt
 +++ b/src/server/scripts/Northrend/CMakeLists.txt
-@@ -155,6 +155,7 @@ set(scripts_STAT_SRCS
+@@ -156,6 +156,7 @@ set(scripts_STAT_SRCS
    Northrend/IcecrownCitadel/boss_blood_queen_lana_thel.cpp
    Northrend/zuldrak.cpp
    Northrend/icecrown.cpp

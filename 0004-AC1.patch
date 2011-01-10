@@ -1,6 +1,6 @@
-From 5900d4940e973944e72131733478cbb66a69847f Mon Sep 17 00:00:00 2001
+From 2445a5759d909729116eb953712d2feff7bc9c24 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 6 Jan 2011 17:40:29 -0200
+Date: Mon, 10 Jan 2011 11:18:19 -0200
 Subject: [PATCH 4/6] AC1
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
@@ -120,7 +120,7 @@ index 0000000..0cf9c73
 +
 +ALTER TABLE `cheaters` DROP COLUMN `Pos`;
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 97b5b0a..7a5552e 100755
+index f733d87..5b02000 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -528,6 +528,17 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
@@ -141,7 +141,7 @@ index 97b5b0a..7a5552e 100755
      m_mailsLoaded = false;
      m_mailsUpdated = false;
      unReadMails = 0;
-@@ -24445,7 +24456,9 @@ uint8 Player::CanEquipUniqueItem(ItemPrototype const* itemProto, uint8 except_sl
+@@ -24477,7 +24488,9 @@ uint8 Player::CanEquipUniqueItem(ItemPrototype const* itemProto, uint8 except_sl
  void Player::HandleFall(MovementInfo const& movementInfo)
  {
      // calculate total z distance of the fall
@@ -626,10 +626,10 @@ index a9dae24..b2ab540 100755
  
          void ReadAddonsInfo(WorldPacket &data);
 diff --git a/src/server/game/Spells/Auras/SpellAuraEffects.cpp b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-index ffb5d16..7ba40a1 100755
+index f811b20..55c99fc 100755
 --- a/src/server/game/Spells/Auras/SpellAuraEffects.cpp
 +++ b/src/server/game/Spells/Auras/SpellAuraEffects.cpp
-@@ -3887,9 +3887,15 @@ void AuraEffect::HandleAuraAllowFlight(AuraApplication const * aurApp, uint8 mod
+@@ -3911,9 +3911,15 @@ void AuraEffect::HandleAuraAllowFlight(AuraApplication const * aurApp, uint8 mod
          // allow fly
          WorldPacket data;
          if (apply)
@@ -645,7 +645,7 @@ index ffb5d16..7ba40a1 100755
          data.append(target->GetPackGUID());
          data << uint32(0);                                      // unk
          plr->SendDirectMessage(&data);
-@@ -4290,9 +4296,15 @@ void AuraEffect::HandleAuraModIncreaseFlightSpeed(AuraApplication const * aurApp
+@@ -4314,9 +4320,15 @@ void AuraEffect::HandleAuraModIncreaseFlightSpeed(AuraApplication const * aurApp
              {
                  WorldPacket data;
                  if (apply)

@@ -1,6 +1,6 @@
-From f4fe745bbc2347670ef64469a6abcf333045bb96 Mon Sep 17 00:00:00 2001
+From af074e2a657ff3feb7b94c69b49e5b39490f4093 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 6 Jan 2011 17:38:57 -0200
+Date: Mon, 10 Jan 2011 11:16:48 -0200
 Subject: [PATCH 1/6] Bots
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
@@ -11695,7 +11695,7 @@ index ff08de3..4031e42 100755
          default:    return NULL;
      }
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 1963201..97b5b0a 100755
+index 4a4a4f1..f733d87 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -69,6 +69,11 @@
@@ -11788,7 +11788,7 @@ index 1963201..97b5b0a 100755
      // clean up player-instance binds, may unload some instance saves
      for (uint8 i = 0; i < MAX_DIFFICULTY; ++i)
          for (BoundInstancesMap::iterator itr = m_boundInstances[i].begin(); itr != m_boundInstances[i].end(); ++itr)
-@@ -1462,6 +1514,22 @@ void Player::Update(uint32 p_time)
+@@ -1463,6 +1515,22 @@ void Player::Update(uint32 p_time)
          RegenerateAll();
      }
  
@@ -11811,7 +11811,7 @@ index 1963201..97b5b0a 100755
      if (m_deathState == JUST_DIED)
          KillPlayer();
  
-@@ -1525,6 +1593,9 @@ void Player::Update(uint32 p_time)
+@@ -1526,6 +1594,9 @@ void Player::Update(uint32 p_time)
      //because we don't want player's ghost teleported from graveyard
      if (IsHasDelayedTeleport() && isAlive())
          TeleportTo(m_teleport_dest, m_teleport_options);
@@ -11821,7 +11821,7 @@ index 1963201..97b5b0a 100755
  }
  
  void Player::setDeathState(DeathState s)
-@@ -1780,7 +1851,8 @@ void Player::SendTeleportPacket(Position &oldPos)
+@@ -1782,7 +1853,8 @@ void Player::SendTeleportPacket(Position &oldPos)
      WorldPacket data2(MSG_MOVE_TELEPORT, 38);
      data2.append(GetPackGUID());
      BuildMovementPacket(&data2);
@@ -11831,7 +11831,7 @@ index 1963201..97b5b0a 100755
      SendMessageToSet(&data2, false);
  }
  
-@@ -1830,6 +1902,16 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
+@@ -1832,6 +1904,16 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
          return false;
      }
  
@@ -11848,7 +11848,7 @@ index 1963201..97b5b0a 100755
      // preparing unsummon pet if lost (we must get pet before teleportation or will not find it later)
      Pet* pet = GetPet();
  
-@@ -1879,6 +1961,33 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
+@@ -1881,6 +1963,33 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
          }
      }
  
@@ -11882,7 +11882,7 @@ index 1963201..97b5b0a 100755
      // The player was ported to another map and loses the duel immediately.
      // We have to perform this check before the teleport, otherwise the
      // ObjectAccessor won't find the flag.
-@@ -2055,6 +2164,20 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
+@@ -2057,6 +2166,20 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
          else
              return false;
      }
@@ -11903,7 +11903,7 @@ index 1963201..97b5b0a 100755
      return true;
  }
  
-@@ -2169,6 +2292,1094 @@ void Player::RemoveFromWorld()
+@@ -2171,6 +2294,1094 @@ void Player::RemoveFromWorld()
      }
  }
  
@@ -12998,7 +12998,7 @@ index 1963201..97b5b0a 100755
  void Player::RegenerateAll()
  {
      //if (m_regenTimer <= 500)
-@@ -2444,7 +3655,7 @@ Player::GetNPCIfCanInteractWith(uint64 guid, uint32 npcflagmask)
+@@ -2446,7 +3657,7 @@ Player::GetNPCIfCanInteractWith(uint64 guid, uint32 npcflagmask)
                      return NULL;
  
      // not too far
@@ -13007,7 +13007,7 @@ index 1963201..97b5b0a 100755
          return NULL;
  
      return unit;
-@@ -2632,6 +3843,31 @@ void Player::RemoveFromGroup(Group* group, uint64 guid, RemoveMethod method /* =
+@@ -2634,6 +3845,31 @@ void Player::RemoveFromGroup(Group* group, uint64 guid, RemoveMethod method /* =
  {
      if (group)
      {
@@ -13039,7 +13039,7 @@ index 1963201..97b5b0a 100755
          if (group->RemoveMember(guid, method, kicker, reason) <= 1)
          {
              // group->Disband(); already disbanded in RemoveMember
-@@ -6856,6 +8092,11 @@ bool Player::RewardHonor(Unit *uVictim, uint32 groupsize, int32 honor, bool pvpt
+@@ -6864,6 +8100,11 @@ bool Player::RewardHonor(Unit *uVictim, uint32 groupsize, int32 honor, bool pvpt
          {
              Player *pVictim = uVictim->ToPlayer();
  
@@ -13051,7 +13051,7 @@ index 1963201..97b5b0a 100755
              if (GetTeam() == pVictim->GetTeam() && !sWorld->IsFFAPvPRealm())
                  return false;
  
-@@ -13228,7 +14469,6 @@ void Player::ApplyEnchantment(Item *item, EnchantmentSlot slot, bool apply, bool
+@@ -13265,7 +14506,6 @@ void Player::ApplyEnchantment(Item *item, EnchantmentSlot slot, bool apply, bool
              uint32 enchant_display_type = pEnchant->type[s];
              uint32 enchant_amount = pEnchant->amount[s];
              uint32 enchant_spell_id = pEnchant->spellid[s];
@@ -13059,7 +13059,7 @@ index 1963201..97b5b0a 100755
              switch(enchant_display_type)
              {
                  case ITEM_ENCHANTMENT_TYPE_NONE:
-@@ -13852,7 +15092,6 @@ void Player::OnGossipSelect(WorldObject* pSource, uint32 gossipListId, uint32 me
+@@ -13889,7 +15129,6 @@ void Player::OnGossipSelect(WorldObject* pSource, uint32 gossipListId, uint32 me
              return;
          }
      }
@@ -13067,7 +13067,7 @@ index 1963201..97b5b0a 100755
      GossipMenuItemData pMenuData = gossipmenu.GetItemData(gossipListId);
  
      switch(gossipOptionId)
-@@ -15488,6 +16727,9 @@ void Player::KilledMonsterCredit(uint32 entry, uint64 guid)
+@@ -15520,6 +16759,9 @@ void Player::KilledMonsterCredit(uint32 entry, uint64 guid)
              }
          }
      }
@@ -13077,7 +13077,7 @@ index 1963201..97b5b0a 100755
  }
  
  void Player::CastedCreatureOrGO(uint32 entry, uint64 guid, uint32 spell_id)
-@@ -15613,6 +16855,7 @@ void Player::TalkedToCreature(uint32 entry, uint64 guid)
+@@ -15645,6 +16887,7 @@ void Player::TalkedToCreature(uint32 entry, uint64 guid)
                              m_QuestStatusSave[questid] = true;
  
                              SendQuestUpdateAddCreatureOrGo(qInfo, guid, j, curTalkCount, addTalkCount);
@@ -13085,7 +13085,7 @@ index 1963201..97b5b0a 100755
                          }
                          if (CanCompleteQuest(questid))
                              CompleteQuest(questid);
-@@ -17940,6 +19183,18 @@ void Player::SaveToDB()
+@@ -17972,6 +19215,18 @@ void Player::SaveToDB()
  
      if (!IsBeingTeleported())
      {
@@ -13104,7 +13104,7 @@ index 1963201..97b5b0a 100755
          ss << GetMapId() << ", "
          << (uint32)GetInstanceId() << ", "
          << uint32(uint8(GetDungeonDifficulty()) | uint8(GetRaidDifficulty()) << 4) << ", "
-@@ -17947,9 +19202,22 @@ void Player::SaveToDB()
+@@ -17979,9 +19234,22 @@ void Player::SaveToDB()
          << finiteAlways(GetPositionY()) << ", "
          << finiteAlways(GetPositionZ()) << ", "
          << finiteAlways(GetOrientation()) << ", ";
@@ -13127,7 +13127,7 @@ index 1963201..97b5b0a 100755
          ss << GetTeleportDest().GetMapId() << ", "
          << (uint32)0 << ", "
          << uint32(uint8(GetDungeonDifficulty()) | uint8(GetRaidDifficulty()) << 4) << ", "
-@@ -17957,6 +19225,7 @@ void Player::SaveToDB()
+@@ -17989,6 +19257,7 @@ void Player::SaveToDB()
          << finiteAlways(GetTeleportDest().GetPositionY()) << ", "
          << finiteAlways(GetTeleportDest().GetPositionZ()) << ", "
          << finiteAlways(GetTeleportDest().GetOrientation()) << ", ";
@@ -13302,10 +13302,10 @@ index caabac6..48c4ac8 100755
          float  m_lastFallZ;
  
 diff --git a/src/server/game/Entities/Unit/Unit.cpp b/src/server/game/Entities/Unit/Unit.cpp
-index b35ba61..1573dfe 100755
+index bb3a127..f679c9b 100755
 --- a/src/server/game/Entities/Unit/Unit.cpp
 +++ b/src/server/game/Entities/Unit/Unit.cpp
-@@ -15548,6 +15548,17 @@ void Unit::RemoveCharmedBy(Unit *charmer)
+@@ -15561,6 +15561,17 @@ void Unit::RemoveCharmedBy(Unit *charmer)
              case CHARM_TYPE_CONVERT:
                  break;
          }
@@ -13682,7 +13682,7 @@ index 37358c7..63c1e81 100755
      MAX_QUEST_STATUS
  };
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index 48056f7..3e97cb3 100755
+index 794bb10..165164c 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
 @@ -77,6 +77,18 @@ void AddSC_npcs_special();
@@ -13704,7 +13704,7 @@ index 48056f7..3e97cb3 100755
  //eastern kingdoms
  void AddSC_alterac_valley();                 //Alterac Valley
  void AddSC_boss_balinda();
-@@ -664,6 +676,17 @@ void AddWorldScripts()
+@@ -665,6 +677,17 @@ void AddWorldScripts()
      AddSC_npc_taxi();
      AddSC_achievement_scripts();
      AddSC_chat_log();
@@ -14052,7 +14052,7 @@ index 9981dfe..27e4d5d 100755
              ChatHandler::FillMessageData(&data, this, type, lang, NULL, 0, msg.c_str(), NULL);
              group->BroadcastPacket(&data, false, group->GetMemberGroup(GetPlayer()->GetGUID()));
 diff --git a/src/server/game/Server/Protocol/Handlers/GroupHandler.cpp b/src/server/game/Server/Protocol/Handlers/GroupHandler.cpp
-index 8deedbc..df41958 100755
+index f7f5462..324b059 100755
 --- a/src/server/game/Server/Protocol/Handlers/GroupHandler.cpp
 +++ b/src/server/game/Server/Protocol/Handlers/GroupHandler.cpp
 @@ -289,6 +289,14 @@ void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket & recv_data)

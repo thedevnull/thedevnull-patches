@@ -1,6 +1,6 @@
-From 0b2ebe43d2c9f6cc3a6ccc84e20be5b955d6a27b Mon Sep 17 00:00:00 2001
+From a287debc8295080e5a2ba2587d64b395edb89f5a Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Thu, 6 Jan 2011 17:40:55 -0200
+Date: Mon, 10 Jan 2011 11:18:35 -0200
 Subject: [PATCH 5/6] TeleNPC2
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
@@ -702,7 +702,7 @@ index 0000000..4830245
 +
 +#endif
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index 3e97cb3..1ec4038 100755
+index 165164c..3d5fac7 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
 @@ -25,6 +25,9 @@ void AddSC_example_gossip_codebox();
@@ -715,7 +715,7 @@ index 3e97cb3..1ec4038 100755
  // spells
  void AddSC_deathknight_spell_scripts();
  void AddSC_druid_spell_scripts();
-@@ -1223,6 +1226,7 @@ void AddCustomScripts()
+@@ -1225,6 +1228,7 @@ void AddCustomScripts()
  {
  #ifdef SCRIPTS
      /* This is where custom scripts should be added. */
