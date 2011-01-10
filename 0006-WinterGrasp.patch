@@ -1,7 +1,7 @@
-From f2a71c6c7a3344e3db1baefffa76a40bd48b129e Mon Sep 17 00:00:00 2001
+From 4d7af1d5caa98c22587d580de4d8ddf367fb13da Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Mon, 10 Jan 2011 11:19:14 -0200
-Subject: [PATCH 6/6] Wintergrasp
+Date: Mon, 10 Jan 2011 11:57:52 -0200
+Subject: [PATCH 6/6] WinterGrasp
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -14,13 +14,13 @@ Subject: [PATCH 6/6] Wintergrasp
  src/server/game/Miscellaneous/Language.h           |   23 +
  src/server/game/OutdoorPvP/OutdoorPvP.h            |    3 +-
  src/server/game/OutdoorPvP/OutdoorPvPMgr.cpp       |    1 +
- src/server/game/Scripting/ScriptLoader.cpp         |    3 +
+ src/server/game/Scripting/ScriptLoader.cpp         |    4 +
  .../Protocol/Handlers/BattleGroundHandler.cpp      |   25 +
  .../Server/Protocol/Handlers/CharacterHandler.cpp  |   20 +
  src/server/game/Spells/Auras/SpellAuraEffects.cpp  |    8 +
  src/server/game/Spells/Spell.cpp                   |   12 +
  src/server/game/Spells/SpellEffects.cpp            |   35 +
- src/server/game/Spells/SpellMgr.cpp                |    2 +
+ src/server/game/Spells/SpellMgr.cpp                |   19 +
  src/server/game/World/World.cpp                    |   43 +
  src/server/game/World/World.h                      |   28 +
  src/server/scripts/CMakeLists.txt                  |    1 +
@@ -30,7 +30,7 @@ Subject: [PATCH 6/6] Wintergrasp
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp     | 2290 ++++++++++++++++++++
  src/server/scripts/OutdoorPvP/OutdoorPvPWG.h       |  339 +++
  src/server/worldserver/worldserver.conf.dist       |  127 ++
- 25 files changed, 3338 insertions(+), 1 deletions(-)
+ 25 files changed, 3356 insertions(+), 1 deletions(-)
  create mode 100644 sql/Wintergrasp/Wintergrasp_world.sql
  create mode 100644 src/server/scripts/Northrend/wintergrasp.cpp
  create mode 100644 src/server/scripts/OutdoorPvP/OutdoorPvPWG.cpp
@@ -468,7 +468,7 @@ index 4ccc31a..d91366c 100755
  #include "Player.h"
  #include "DisableMgr.h"
 diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
-index 3d5fac7..5307d5b 100755
+index 3d5fac7..4af7d7e 100755
 --- a/src/server/game/Scripting/ScriptLoader.cpp
 +++ b/src/server/game/Scripting/ScriptLoader.cpp
 @@ -582,6 +582,7 @@ void AddSC_shadowmoon_valley();
@@ -487,7 +487,15 @@ index 3d5fac7..5307d5b 100755
  
  // player
  void AddSC_chat_log();
-@@ -1210,6 +1212,7 @@ void AddOutdoorPvPScripts()
+@@ -1198,6 +1200,7 @@ void AddNorthrendScripts()
+     AddSC_zuldrak();
+     AddSC_crystalsong_forest();
+     AddSC_isle_of_conquest();
++	AddSC_wintergrasp();
+ #endif
+ }
+ 
+@@ -1210,6 +1213,7 @@ void AddOutdoorPvPScripts()
      AddSC_outdoorpvp_si();
      AddSC_outdoorpvp_tf();
      AddSC_outdoorpvp_zm();
@@ -714,10 +722,20 @@ index 601195a..fd2fe6d 100755
              unitTarget->ToPlayer()->GetSession()->SendNotification(LANG_ZONE_NOFLYZONE);
              break;
 diff --git a/src/server/game/Spells/SpellMgr.cpp b/src/server/game/Spells/SpellMgr.cpp
-index c736e3e..4b34040 100755
+index c736e3e..f326622 100755
 --- a/src/server/game/Spells/SpellMgr.cpp
 +++ b/src/server/game/Spells/SpellMgr.cpp
-@@ -3057,6 +3057,8 @@ bool IsPartOfSkillLine(uint32 skillId, uint32 spellId)
+@@ -29,6 +29,9 @@
+ #include "MapManager.h"
+ #include "BattlegroundIC.h"
+ 
++#include "OutdoorPvPMgr.h"
++#include "OutdoorPvPWG.h"
++
+ bool IsAreaEffectTarget[TOTAL_SPELL_TARGETS];
+ SpellEffectTargetTypes EffectTargetType[TOTAL_SPELL_EFFECTS];
+ SpellSelectTargetTypes SpellTargetType[TOTAL_SPELL_TARGETS];
+@@ -3057,6 +3060,8 @@ bool IsPartOfSkillLine(uint32 skillId, uint32 spellId)
  
  bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32 newArea) const
  {
@@ -726,6 +744,27 @@ index c736e3e..4b34040 100755
      if (gender != GENDER_NONE)                   // not in expected gender
          if (!player || gender != player->getGender())
              return false;
+@@ -3096,6 +3101,20 @@ bool SpellArea::IsFitToRequirements(Player const* player, uint32 newZone, uint32
+                     return false;
+                 break;
+             }
++        case 58730: // No fly Zone - Wintergrasp
++			{
++				if (sWorld->getBoolConfig(CONFIG_OUTDOORPVP_WINTERGRASP_ENABLED))
++				{
++				  if ((pvpWG->isWarTime()==false) || !player || (!player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) && !player->HasAuraType(SPELL_AURA_FLY)) || player->HasAura(45472) || player->HasAura(44795) || player->GetPositionZ())
++				    return false;
++				}
++			}
++            break;
++        case 58045: // Essence of Wintergrasp - Wintergrasp
++        case 57940: // Essence of Wintergrasp - Northrend
++             if (!player || player->GetTeamId() != sWorld->getWorldState(WORLDSTATE_WINTERGRASP_CONTROLING_FACTION))
++             return false;
++             break;			 
+         case SPELL_OIL_REFINERY: // Oil Refinery - Isle of Conquest.
+         case SPELL_QUARRY: // Quarry - Isle of Conquest.
+             {
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
 index 6f0edaf..19e82a7 100755
 --- a/src/server/game/World/World.cpp
