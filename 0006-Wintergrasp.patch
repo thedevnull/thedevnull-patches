@@ -1,7 +1,7 @@
-From 4d7af1d5caa98c22587d580de4d8ddf367fb13da Mon Sep 17 00:00:00 2001
+From 15cca655311ad3320df0bca8922c943293851ea0 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Mon, 10 Jan 2011 11:57:52 -0200
-Subject: [PATCH 6/6] WinterGrasp
+Date: Tue, 11 Jan 2011 14:09:28 -0200
+Subject: [PATCH 6/6] Wintergrasp
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
 ---
@@ -380,7 +380,7 @@ index 00962a9..082678d 100755
  {
      if (!*args)
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 5b02000..65b21b3 100755
+index 5479cac..f50702d 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -55,6 +55,7 @@
@@ -391,7 +391,7 @@ index 5b02000..65b21b3 100755
  #include "ArenaTeam.h"
  #include "Chat.h"
  #include "Spell.h"
-@@ -10033,6 +10034,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
+@@ -10032,6 +10033,13 @@ void Player::SendInitWorldStates(uint32 zoneid, uint32 areaid)
      data << uint32(0x8d3) << uint32(0x0);                   // 6
                                                              // 7 1 - Arena season in progress, 0 - end of season
      data << uint32(0xC77) << uint32(sWorld->getBoolConfig(CONFIG_ARENA_SEASON_IN_PROGRESS));
@@ -722,7 +722,7 @@ index 601195a..fd2fe6d 100755
              unitTarget->ToPlayer()->GetSession()->SendNotification(LANG_ZONE_NOFLYZONE);
              break;
 diff --git a/src/server/game/Spells/SpellMgr.cpp b/src/server/game/Spells/SpellMgr.cpp
-index c736e3e..f326622 100755
+index c736e3e..94e7a58 100755
 --- a/src/server/game/Spells/SpellMgr.cpp
 +++ b/src/server/game/Spells/SpellMgr.cpp
 @@ -29,6 +29,9 @@
@@ -761,7 +761,7 @@ index c736e3e..f326622 100755
 +        case 57940: // Essence of Wintergrasp - Northrend
 +             if (!player || player->GetTeamId() != sWorld->getWorldState(WORLDSTATE_WINTERGRASP_CONTROLING_FACTION))
 +             return false;
-+             break;			 
++             break;
          case SPELL_OIL_REFINERY: // Oil Refinery - Isle of Conquest.
          case SPELL_QUARRY: // Quarry - Isle of Conquest.
              {

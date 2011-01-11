@@ -1,6 +1,6 @@
-From 5391821bc0cd05bb8e85c7bfb7c70bd47da70dc6 Mon Sep 17 00:00:00 2001
+From 2aa8581773297ffd96b950ac45d0c00e2443d5c1 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
-Date: Mon, 10 Jan 2011 11:44:21 -0200
+Date: Tue, 11 Jan 2011 14:06:46 -0200
 Subject: [PATCH 1/6] Bots
  Signed-off-by: thedevnull <daniellage18@gmail.com>
 
@@ -10,7 +10,7 @@ Subject: [PATCH 1/6] Bots
  sql/Bots/world_bots.sql                            |  245 ++
  sql/Bots/world_bots_update.sql                     |   13 +
  sql/CMakeLists.txt                                 |    1 +
- src/server/game/AI/Bots/PlayerbotAI.cpp            | 4489 ++++++++++++++++++++
+ src/server/game/AI/Bots/PlayerbotAI.cpp            | 4498 ++++++++++++++++++++
  src/server/game/AI/Bots/PlayerbotAI.h              |  284 ++
  src/server/game/AI/Bots/PlayerbotClassAI.cpp       |  592 +++
  src/server/game/AI/Bots/PlayerbotClassAI.h         |  162 +
@@ -90,7 +90,7 @@ Subject: [PATCH 1/6] Bots
  src/server/scripts/CMakeLists.txt                  |    1 +
  src/server/shared/Common.h                         |    4 +
  src/server/worldserver/worldserver.conf.dist       |   36 +
- 85 files changed, 18084 insertions(+), 40 deletions(-)
+ 85 files changed, 18093 insertions(+), 40 deletions(-)
  create mode 100644 sql/Bots/CMakeLists.txt
  create mode 100644 sql/Bots/characters_bots.sql
  create mode 100644 sql/Bots/world_bots.sql
@@ -448,10 +448,10 @@ index e1b0921..7cd8acf 100644
    )
 diff --git a/src/server/game/AI/Bots/PlayerbotAI.cpp b/src/server/game/AI/Bots/PlayerbotAI.cpp
 new file mode 100644
-index 0000000..d05e0ec
+index 0000000..1b944d7
 --- /dev/null
 +++ b/src/server/game/AI/Bots/PlayerbotAI.cpp
-@@ -0,0 +1,4489 @@
+@@ -0,0 +1,4498 @@
 +#include "Common.h"
 +#include "Database/DatabaseEnv.h"
 +#include "DBCStores.h"
@@ -2928,7 +2928,16 @@ index 0000000..d05e0ec
 +void PlayerbotAI::SendWhisper(const std::string &text, Player &player)
 +{
 +    WorldPacket data(SMSG_MESSAGECHAT, 200);
-+    m_bot->BuildPlayerChat(&data, CHAT_MSG_WHISPER_INFORM, text, LANG_UNIVERSAL);
++
++    data << uint8(CHAT_MSG_WHISPER_INFORM);
++    data << uint32(LANG_UNIVERSAL);
++    data << uint64(player.GetGUID());
++    data << uint32(LANG_UNIVERSAL);                               //language 2.1.0 ?
++    data << uint64(player.GetGUID());
++    data << uint32(text.length() + 1);
++    data << text;
++    data << uint8(player.chatTag());
++
 +    player.GetSession()->SendPacket(&data);
 +}
 +
@@ -11695,7 +11704,7 @@ index ff08de3..4031e42 100755
          default:    return NULL;
      }
 diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
-index 4a4a4f1..f733d87 100755
+index 45fcef3..1fe3d90 100755
 --- a/src/server/game/Entities/Player/Player.cpp
 +++ b/src/server/game/Entities/Player/Player.cpp
 @@ -69,6 +69,11 @@
@@ -13051,7 +13060,7 @@ index 4a4a4f1..f733d87 100755
              if (GetTeam() == pVictim->GetTeam() && !sWorld->IsFFAPvPRealm())
                  return false;
  
-@@ -13265,7 +14506,6 @@ void Player::ApplyEnchantment(Item *item, EnchantmentSlot slot, bool apply, bool
+@@ -13264,7 +14505,6 @@ void Player::ApplyEnchantment(Item *item, EnchantmentSlot slot, bool apply, bool
              uint32 enchant_display_type = pEnchant->type[s];
              uint32 enchant_amount = pEnchant->amount[s];
              uint32 enchant_spell_id = pEnchant->spellid[s];
@@ -13059,7 +13068,7 @@ index 4a4a4f1..f733d87 100755
              switch(enchant_display_type)
              {
                  case ITEM_ENCHANTMENT_TYPE_NONE:
-@@ -13889,7 +15129,6 @@ void Player::OnGossipSelect(WorldObject* pSource, uint32 gossipListId, uint32 me
+@@ -13888,7 +15128,6 @@ void Player::OnGossipSelect(WorldObject* pSource, uint32 gossipListId, uint32 me
              return;
          }
      }
@@ -13067,7 +13076,7 @@ index 4a4a4f1..f733d87 100755
      GossipMenuItemData pMenuData = gossipmenu.GetItemData(gossipListId);
  
      switch(gossipOptionId)
-@@ -15520,6 +16759,9 @@ void Player::KilledMonsterCredit(uint32 entry, uint64 guid)
+@@ -15519,6 +16758,9 @@ void Player::KilledMonsterCredit(uint32 entry, uint64 guid)
              }
          }
      }
@@ -13077,7 +13086,7 @@ index 4a4a4f1..f733d87 100755
  }
  
  void Player::CastedCreatureOrGO(uint32 entry, uint64 guid, uint32 spell_id)
-@@ -15645,6 +16887,7 @@ void Player::TalkedToCreature(uint32 entry, uint64 guid)
+@@ -15644,6 +16886,7 @@ void Player::TalkedToCreature(uint32 entry, uint64 guid)
                              m_QuestStatusSave[questid] = true;
  
                              SendQuestUpdateAddCreatureOrGo(qInfo, guid, j, curTalkCount, addTalkCount);
@@ -13085,7 +13094,7 @@ index 4a4a4f1..f733d87 100755
                          }
                          if (CanCompleteQuest(questid))
                              CompleteQuest(questid);
-@@ -17972,6 +19215,18 @@ void Player::SaveToDB()
+@@ -17971,6 +19214,18 @@ void Player::SaveToDB()
  
      if (!IsBeingTeleported())
      {
@@ -13104,7 +13113,7 @@ index 4a4a4f1..f733d87 100755
          ss << GetMapId() << ", "
          << (uint32)GetInstanceId() << ", "
          << uint32(uint8(GetDungeonDifficulty()) | uint8(GetRaidDifficulty()) << 4) << ", "
-@@ -17979,9 +19234,22 @@ void Player::SaveToDB()
+@@ -17978,9 +19233,22 @@ void Player::SaveToDB()
          << finiteAlways(GetPositionY()) << ", "
          << finiteAlways(GetPositionZ()) << ", "
          << finiteAlways(GetOrientation()) << ", ";
@@ -13127,7 +13136,7 @@ index 4a4a4f1..f733d87 100755
          ss << GetTeleportDest().GetMapId() << ", "
          << (uint32)0 << ", "
          << uint32(uint8(GetDungeonDifficulty()) | uint8(GetRaidDifficulty()) << 4) << ", "
-@@ -17989,6 +19257,7 @@ void Player::SaveToDB()
+@@ -17988,6 +19256,7 @@ void Player::SaveToDB()
          << finiteAlways(GetTeleportDest().GetPositionY()) << ", "
          << finiteAlways(GetTeleportDest().GetPositionZ()) << ", "
          << finiteAlways(GetTeleportDest().GetOrientation()) << ", ";
@@ -13302,10 +13311,10 @@ index caabac6..48c4ac8 100755
          float  m_lastFallZ;
  
 diff --git a/src/server/game/Entities/Unit/Unit.cpp b/src/server/game/Entities/Unit/Unit.cpp
-index bb3a127..f679c9b 100755
+index 4f67d9c..49c1611 100755
 --- a/src/server/game/Entities/Unit/Unit.cpp
 +++ b/src/server/game/Entities/Unit/Unit.cpp
-@@ -15561,6 +15561,17 @@ void Unit::RemoveCharmedBy(Unit *charmer)
+@@ -15549,6 +15549,17 @@ void Unit::RemoveCharmedBy(Unit *charmer)
              case CHARM_TYPE_CONVERT:
                  break;
          }
