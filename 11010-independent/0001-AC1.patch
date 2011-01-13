@@ -1,4 +1,4 @@
-From 174501d4e1159ea288c067bdb18fc7aeceaadd24 Mon Sep 17 00:00:00 2001
+From 9c2bfb000248fe11f898bc33b02930219b3c5968 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
 Date: Wed, 12 Jan 2011 01:08:40 -0200
 Subject: [PATCH] AC1
@@ -662,7 +662,7 @@ index f811b20..55c99fc 100755
                  data << uint32(0);                                      // unknown
                  plr->SendDirectMessage(&data);
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 1567277..a84529f 100755
+index 0f99fc3..4e67818 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -562,7 +562,19 @@ void World::LoadConfigSettings(bool reload)

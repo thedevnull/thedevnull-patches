@@ -1,4 +1,4 @@
-From e46fe63b824cb27ec372c402bbde1bfb8d0a8563 Mon Sep 17 00:00:00 2001
+From abe1cf37f0f2ecccfc86b995144d1e5f7d1de4ba Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
 Date: Wed, 12 Jan 2011 01:04:17 -0200
 Subject: [PATCH] Ahbot
@@ -4137,7 +4137,7 @@ index 6288fb6..4fb9863 100755
  #include "Log.h"
  #include "Opcodes.h"
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 1567277..da3b4d6 100755
+index 0f99fc3..ea57b1a 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -71,6 +71,7 @@

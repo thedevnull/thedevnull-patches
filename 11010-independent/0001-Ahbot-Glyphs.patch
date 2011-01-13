@@ -1,4 +1,4 @@
-From 8e28827205f3d98ad5744195bbf77d21fca23d3f Mon Sep 17 00:00:00 2001
+From 231f800fe5ab6bec703959ff9dc69792c7252748 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
 Date: Wed, 12 Jan 2011 01:06:32 -0200
 Subject: [PATCH] Ahbot Glyphs
@@ -4246,7 +4246,7 @@ index 6288fb6..4fb9863 100755
  #include "Log.h"
  #include "Opcodes.h"
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 1567277..da3b4d6 100755
+index 0f99fc3..ea57b1a 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -71,6 +71,7 @@

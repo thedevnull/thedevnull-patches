@@ -1,4 +1,4 @@
-From 0b5aa30c8d08a239e657d8c10d4da2a019411dc2 Mon Sep 17 00:00:00 2001
+From d380e54f3bc1bdf78178a1702b594882120d2c91 Mon Sep 17 00:00:00 2001
 From: thedevnull <daniellage18@gmail.com>
 Date: Wed, 12 Jan 2011 01:20:12 -0200
 Subject: [PATCH] Wintergrasp
@@ -622,7 +622,7 @@ index f811b20..cc2ccf2 100755
                      break;
                  case SPELLFAMILY_MAGE:
 diff --git a/src/server/game/Spells/Spell.cpp b/src/server/game/Spells/Spell.cpp
-index 9a29cd9..ab5a4ed 100755
+index 4ca8970..ed0c5f1 100755
 --- a/src/server/game/Spells/Spell.cpp
 +++ b/src/server/game/Spells/Spell.cpp
 @@ -51,6 +51,8 @@
@@ -634,7 +634,7 @@ index 9a29cd9..ab5a4ed 100755
  
  #define SPELL_CHANNEL_UPDATE_INTERVAL (1 * IN_MILLISECONDS)
  
-@@ -4759,6 +4761,8 @@ void Spell::HandleEffects(Unit *pUnitTarget,Item *pItemTarget,GameObject *pGOTar
+@@ -4783,6 +4785,8 @@ void Spell::HandleEffects(Unit *pUnitTarget,Item *pItemTarget,GameObject *pGOTar
  
  SpellCastResult Spell::CheckCast(bool strict)
  {
@@ -643,7 +643,7 @@ index 9a29cd9..ab5a4ed 100755
      // check death state
      if (!m_IsTriggeredSpell && !m_caster->isAlive() && !(m_spellInfo->Attributes & SPELL_ATTR0_PASSIVE) && !(m_spellInfo->Attributes & SPELL_ATTR0_CASTABLE_WHILE_DEAD))
          return SPELL_FAILED_CASTER_DEAD;
-@@ -5618,8 +5622,16 @@ SpellCastResult Spell::CheckCast(bool strict)
+@@ -5642,8 +5646,16 @@ SpellCastResult Spell::CheckCast(bool strict)
                  if (m_originalCaster && m_originalCaster->GetTypeId() == TYPEID_PLAYER && m_originalCaster->isAlive())
                  {
                      if (AreaTableEntry const* pArea = GetAreaEntryByAreaID(m_originalCaster->GetAreaId()))
@@ -661,7 +661,7 @@ index 9a29cd9..ab5a4ed 100755
                  break;
              }
 diff --git a/src/server/game/Spells/SpellEffects.cpp b/src/server/game/Spells/SpellEffects.cpp
-index 601195a..fd2fe6d 100755
+index 622b0a1..235e204 100755
 --- a/src/server/game/Spells/SpellEffects.cpp
 +++ b/src/server/game/Spells/SpellEffects.cpp
 @@ -48,6 +48,7 @@
@@ -724,7 +724,7 @@ index 601195a..fd2fe6d 100755
              unitTarget->ToPlayer()->GetSession()->SendNotification(LANG_ZONE_NOFLYZONE);
              break;
 diff --git a/src/server/game/Spells/SpellMgr.cpp b/src/server/game/Spells/SpellMgr.cpp
-index c736e3e..94e7a58 100755
+index 7bc7a97..48d3eff 100755
 --- a/src/server/game/Spells/SpellMgr.cpp
 +++ b/src/server/game/Spells/SpellMgr.cpp
 @@ -29,6 +29,9 @@
@@ -768,7 +768,7 @@ index c736e3e..94e7a58 100755
          case SPELL_QUARRY: // Quarry - Isle of Conquest.
              {
 diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
-index 1567277..d0ebac7 100755
+index 0f99fc3..c6c5f12 100755
 --- a/src/server/game/World/World.cpp
 +++ b/src/server/game/World/World.cpp
 @@ -48,6 +48,7 @@
