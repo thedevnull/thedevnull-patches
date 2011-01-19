@@ -1,0 +1,946 @@
+From 1df66fdfe795524a5411cdde11c0ee4efd58b113 Mon Sep 17 00:00:00 2001
+From: thedevnull <daniellage18@gmail.com>
+Date: Wed, 19 Jan 2011 13:44:14 -0200
+Subject: [PATCH] passive_anticheat
+ Signed-off-by: thedevnull <daniellage18@gmail.com>
+
+---
+ sql/anticheat.sql                                  |   14 +
+ src/server/game/Anticheat/AnticheatMgr.cpp         |  206 +++++++++++++
+ src/server/game/Anticheat/AnticheatMgr.h           |   52 ++++
+ src/server/game/CMakeLists.txt                     |    3 +
+ src/server/game/Entities/Player/Player.cpp         |   22 ++
+ src/server/game/Entities/Player/Player.h           |   14 +
+ src/server/game/Entities/Unit/Unit.cpp             |    7 +
+ src/server/game/Scripting/ScriptLoader.cpp         |    2 +
+ .../Server/Protocol/Handlers/MovementHandler.cpp   |    4 +
+ src/server/game/Spells/SpellEffects.cpp            |   10 +
+ src/server/game/World/World.cpp                    |    3 +
+ src/server/game/World/World.h                      |    2 +
+ src/server/scripts/Commands/CMakeLists.txt         |    1 +
+ src/server/scripts/Commands/cs_anticheat.cpp       |  307 ++++++++++++++++++++
+ src/server/worldserver/worldserver.conf.dist       |   14 +
+ 15 files changed, 661 insertions(+), 0 deletions(-)
+ create mode 100644 sql/anticheat.sql
+ create mode 100644 src/server/game/Anticheat/AnticheatMgr.cpp
+ create mode 100644 src/server/game/Anticheat/AnticheatMgr.h
+ create mode 100644 src/server/scripts/Commands/cs_anticheat.cpp
+
+diff --git a/sql/anticheat.sql b/sql/anticheat.sql
+new file mode 100644
+index 0000000..5ee8494
+--- /dev/null
++++ b/sql/anticheat.sql
+@@ -0,0 +1,14 @@
++DROP TABLE IF EXISTS `players_reports_status`;
++
++CREATE TABLE `players_reports_status` (
++  `guid` int(10) unsigned NOT NULL DEFAULT '0',
++  `creation_time` int(10) unsigned NOT NULL DEFAULT '0',
++  `average` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `total_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `speed_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `fly_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `jump_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `waterwalk_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  `teleportplane_reports` bigint(20) unsigned NOT NULL DEFAULT '0',
++  PRIMARY KEY (`guid`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='';
+\ No newline at end of file
+diff --git a/src/server/game/Anticheat/AnticheatMgr.cpp b/src/server/game/Anticheat/AnticheatMgr.cpp
+new file mode 100644
+index 0000000..a5b4fd8
+--- /dev/null
++++ b/src/server/game/Anticheat/AnticheatMgr.cpp
+@@ -0,0 +1,206 @@
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "AnticheatMgr.h"
++
++AnticheatMgr::AnticheatMgr()
++{
++}
++
++AnticheatMgr::~AnticheatMgr()
++{
++}
++
++void AnticheatMgr::DeletePlayerReport(Player* player)
++{
++    if (!player->GetSession())
++        return;
++
++    CharacterDatabase.PExecute("DELETE FROM players_reports_status WHERE guid IN (SELECT guid FROM characters WHERE account=%u)",player->GetSession()->GetAccountId());
++}
++
++void AnticheatMgr::BuildReport(Player* player,uint8 reportType)
++{
++    if (player->anticheatData.total_reports == 0)
++    {
++        player->anticheatData.creation_time = time(NULL);
++        CharacterDatabase.PExecute("INSERT IGNORE INTO players_reports_status (guid,creation_time) VALUES (%u,%u);",player->GetGUIDLow(),player->anticheatData.creation_time);
++    }
++
++    std::string report_type = report_types[reportType];
++
++    player->anticheatData.type_reports[reportType]++;
++
++    uint64 actual_time = time(NULL) - player->anticheatData.creation_time;
++
++    player->anticheatData.average = player->anticheatData.total_reports > 0 ? ((player->anticheatData.average * (player->anticheatData.total_reports)) + actual_time) / (player->anticheatData.total_reports + 1) : 0;
++    player->anticheatData.total_reports++;
++
++    CharacterDatabase.PExecute("UPDATE players_reports_status SET %s=%u, total_reports=%u, average=%u WHERE guid=%u",report_type.c_str(),player->anticheatData.type_reports[reportType],player->anticheatData.total_reports,player->anticheatData.average,player->GetGUIDLow());
++
++    if (player->anticheatData.total_reports > sWorld->getIntConfig(CONFIG_ANTICHEAT_REPORTS_INGAME_NOTIFICATION))
++    {
++        // display warning at the center of the screen, hacky way?
++        std::string str = "";
++        str = "|cFFFFFC00[AC]|cFF00FFFF[|cFF60FF00" + std::string(player->GetName()) + "|cFF00FFFF] Possible cheater!";
++        WorldPacket data(SMSG_NOTIFICATION, (str.size()+1));
++        data << str;
++        sWorld->SendGlobalGMMessage(&data);
++    }
++}
++
++void AnticheatMgr::DisableAnticheatDetection(Player* player, bool teleport)
++{
++    player->anticheatData.disableACCheck = true;
++    player->anticheatData.disableACCheckTimer = (teleport ? 7000 : 5000);
++}
++
++void AnticheatMgr::HandleHackDetectionTimer(Player* player,uint32 diffTime)
++{
++    if (player->anticheatData.disableACCheck)
++    {
++        if (player->anticheatData.disableACCheckTimer <= diffTime)
++        {
++            player->anticheatData.disableACCheck = false;
++        } else player->anticheatData.disableACCheckTimer -= diffTime;
++    }
++}
++
++void AnticheatMgr::JumpHackDetection(Player* player, MovementInfo movementInfo,uint32 opcode)
++{
++    if (player->anticheatData.lastOpcode == MSG_MOVE_JUMP && opcode == MSG_MOVE_JUMP)
++    {
++        BuildReport(player,JUMP_HACK_REPORT);
++        sLog->outError("Jump Hack Detection Player LowGuid %u",player->GetGUIDLow());
++    }
++}
++
++void AnticheatMgr::WalkOnWaterHackDetection(Player* player, MovementInfo movementInfo)
++{
++    if (!player->anticheatData.lastMovementInfo.HasMovementFlag(MOVEMENTFLAG_WATERWALKING))
++        return;
++
++    // if we are a ghost we can walk on water
++    if (!player->isAlive())
++        return;
++
++    if (player->HasAuraType(SPELL_AURA_FEATHER_FALL) ||
++        player->HasAuraType(SPELL_AURA_SAFE_FALL) ||
++        player->HasAuraType(SPELL_AURA_WATER_WALK))
++        return;
++
++    sLog->outError("Walk on Water Player LowGuid %u",player->GetGUIDLow());
++    BuildReport(player,WALK_WATER_HACK_REPORT);
++
++}
++
++void AnticheatMgr::FlyHackDetection(Player* player, MovementInfo movementInfo)
++{
++    if (!player->anticheatData.lastMovementInfo.HasMovementFlag(MOVEMENTFLAG_FLYING))
++        return;
++
++    if (player->HasAuraType(SPELL_AURA_FLY) ||
++        player->HasAuraType(SPELL_AURA_MOD_INCREASE_MOUNTED_FLIGHT_SPEED) ||
++        player->HasAuraType(SPELL_AURA_MOD_INCREASE_FLIGHT_SPEED))
++        return;
++
++    sLog->outError("FlyHack Player LowGuid %u",player->GetGUIDLow());
++    BuildReport(player,FLY_HACK_REPORT);
++}
++
++void AnticheatMgr::TeleportPlaneHackDetection(Player* player, MovementInfo movementInfo)
++{
++    if (player->anticheatData.lastMovementInfo.pos.GetPositionZ() != 0 ||
++        movementInfo.pos.GetPositionZ() != 0)
++        return;
++
++    if (movementInfo.HasMovementFlag(MOVEMENTFLAG_FALLING))
++        return;
++
++    if (player->getDeathState() == DEAD_FALLING)
++        return;
++    float x, y, z;
++    player->GetPosition(x, y, z);
++    float ground_Z = player->GetMap()->GetHeight(x, y, z);
++    float z_diff = fabs(ground_Z - z);
++
++    // we are not really walking there
++    if (z_diff > 1.0f)
++        BuildReport(player,TELEPORT_PLANE_HACK_REPORT);
++}
++
++void AnticheatMgr::StartHackDetection(Player* player, MovementInfo movementInfo, uint32 opcode)
++{
++    if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++        return;
++
++    if (player->isGameMaster())
++        return;
++
++    if (player->anticheatData.disableACCheck || player->isInFlight() || player->GetTransport() || player->GetVehicle())
++    {
++        player->anticheatData.lastMovementInfo = movementInfo;
++        player->anticheatData.lastOpcode = opcode;
++        return;
++    }
++
++    SpeedHackDetection(player,movementInfo);
++    FlyHackDetection(player,movementInfo);
++    WalkOnWaterHackDetection(player,movementInfo);
++    JumpHackDetection(player,movementInfo,opcode);
++    TeleportPlaneHackDetection(player, movementInfo);
++
++    player->anticheatData.lastMovementInfo = movementInfo;
++    player->anticheatData.lastOpcode = opcode;
++}
++
++
++void AnticheatMgr::SpeedHackDetection(Player* player,MovementInfo movementInfo)
++{
++    uint32 distance2D = (uint32)movementInfo.pos.GetExactDist2d(&player->anticheatData.lastMovementInfo.pos);
++    uint8 moveType = 0;
++
++    // we need to know HOW is the player moving
++    // TO-DO: Should we check the incoming movement flags?
++    if (player->HasUnitMovementFlag(MOVEMENTFLAG_SWIMMING))
++        moveType = MOVE_SWIM;
++    else if (player->IsFlying())
++        moveType = MOVE_FLIGHT;
++    else if (player->HasUnitMovementFlag(MOVEMENTFLAG_WALKING))
++        moveType = MOVE_WALK;
++    else
++        moveType = MOVE_RUN;
++
++    // how many yards the player can do in one sec.
++    uint32 speedRate = (uint32)(player->GetSpeed(UnitMoveType(moveType)) + movementInfo.j_xyspeed);
++
++    // how long the player took to move to here.
++    uint32 timeDiff = getMSTimeDiff(player->anticheatData.lastMovementInfo.time,movementInfo.time);
++
++    if (timeDiff == 0)
++        timeDiff = 1;
++
++    // this is the distance doable by the player in 1 sec, using the time done to move to this point.
++    uint32 clientSpeedRate = distance2D * 1000 / timeDiff;
++
++    //sLog->outError("fallxy %f fallz %f Distance2D %u clientSpeedRate %u speedRate %u timeDiff %u ",movementInfo.j_xyspeed, movementInfo.j_zspeed,distance2D,clientSpeedRate,speedRate,timeDiff);
++
++    // we did the (uint32) cast to accept a margin of tolerance
++    if (clientSpeedRate > speedRate)
++    {
++        BuildReport(player,SPEED_HACK_REPORT);
++        sLog->outError("Speed Hack Player LowGuid %u",player->GetGUIDLow());
++    }
++}
+\ No newline at end of file
+diff --git a/src/server/game/Anticheat/AnticheatMgr.h b/src/server/game/Anticheat/AnticheatMgr.h
+new file mode 100644
+index 0000000..7d1f233
+--- /dev/null
++++ b/src/server/game/Anticheat/AnticheatMgr.h
+@@ -0,0 +1,52 @@
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <ace/Singleton.h>
++
++enum ReportTypes
++{
++    SPEED_HACK_REPORT = 0,
++    FLY_HACK_REPORT,
++    WALK_WATER_HACK_REPORT,
++    JUMP_HACK_REPORT,
++    TELEPORT_PLANE_HACK_REPORT,
++
++    MAX_REPORT_TYPES
++};
++
++const std::string report_types[MAX_REPORT_TYPES] = {"speed_reports", "fly_reports", "waterwalk_reports", "jump_reports", "teleportplane_reports" };
++
++class AnticheatMgr
++{
++    friend class ACE_Singleton<AnticheatMgr, ACE_Null_Mutex>;
++    AnticheatMgr();
++    ~AnticheatMgr();
++
++    public:
++        void StartHackDetection(Player* player, MovementInfo movementInfo, uint32 opcode);
++        void HandleHackDetectionTimer(Player* player, uint32 timeDiff);
++        void DisableAnticheatDetection(Player* player, bool teleport = false);
++        void DeletePlayerReport(Player* player);
++    private:
++        void SpeedHackDetection(Player* player, MovementInfo movementInfo);
++        void FlyHackDetection(Player* player, MovementInfo movementInfo);
++        void WalkOnWaterHackDetection(Player* player, MovementInfo movementInfo);
++        void JumpHackDetection(Player* player, MovementInfo movementInfo,uint32 opcode);
++        void TeleportPlaneHackDetection(Player* player, MovementInfo);
++
++        void BuildReport(Player* player,uint8 reportType);
++};
++
++#define sAnticheatMgr ACE_Singleton<AnticheatMgr, ACE_Null_Mutex>::instance()
+\ No newline at end of file
+diff --git a/src/server/game/CMakeLists.txt b/src/server/game/CMakeLists.txt
+index 323a3ac..3354e96 100644
+--- a/src/server/game/CMakeLists.txt
++++ b/src/server/game/CMakeLists.txt
+@@ -13,6 +13,7 @@ if( USE_COREPCH )
+ endif()
+ 
+ file(GLOB_RECURSE sources_Accounts Accounts/*.cpp Accounts/*.h)
++file(GLOB_RECURSE sources_Anticheat Anticheat/*.cpp Anticheat/*.h)
+ file(GLOB_RECURSE sources_Achievements Achievements/*.cpp Achievements/*.h)
+ file(GLOB_RECURSE sources_Addons Addons/*.cpp Addons/*.h)
+ file(GLOB_RECURSE sources_AI AI/*.cpp AI/*.h)
+@@ -62,6 +63,7 @@ endif()
+ set(game_STAT_SRCS
+   ${game_STAT_SRCS}
+   ${sources_Accounts}
++  ${sources_Anticheat}
+   ${sources_Achievements}
+   ${sources_Addons}
+   ${sources_AI}
+@@ -124,6 +126,7 @@ include_directories(
+   ${CMAKE_SOURCE_DIR}/src/server/shared/Utilities
+   ${CMAKE_CURRENT_SOURCE_DIR}
+   ${CMAKE_CURRENT_SOURCE_DIR}/Accounts
++  ${CMAKE_CURRENT_SOURCE_DIR}/Anticheat
+   ${CMAKE_CURRENT_SOURCE_DIR}/Achievements
+   ${CMAKE_CURRENT_SOURCE_DIR}/Addons
+   ${CMAKE_CURRENT_SOURCE_DIR}/AI
+diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
+index d8dfecd..ccd88b6 100755
+--- a/src/server/game/Entities/Player/Player.cpp
++++ b/src/server/game/Entities/Player/Player.cpp
+@@ -16,6 +16,7 @@
+  * with this program. If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include "AnticheatMgr.h"
+ #include "Common.h"
+ #include "Language.h"
+ #include "DatabaseEnv.h"
+@@ -395,6 +396,19 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
+ #pragma warning(default:4355)
+ #endif
+ 
++    anticheatData.disableACCheck = false;
++    anticheatData.disableACCheckTimer = 0;
++    GetPosition(&anticheatData.lastMovementInfo.pos);
++    anticheatData.lastOpcode = 0;
++
++    anticheatData.total_reports = 0;
++
++    for (uint8 i = 0; i < 5; i++)
++        anticheatData.type_reports[i] = 0;
++
++    anticheatData.average = 0;
++    anticheatData.creation_time = 0;
++
+     m_speakTime = 0;
+     m_speakCount = 0;
+ 
+@@ -616,10 +630,14 @@ Player::Player (WorldSession *session): Unit(), m_achievementMgr(this), m_reputa
+     m_ConditionErrorMsgId = 0;
+ 
+     isDebugAreaTriggers = false;
++
++    sAnticheatMgr->DeletePlayerReport(this);
+ }
+ 
+ Player::~Player ()
+ {
++    sAnticheatMgr->DeletePlayerReport(this);
++
+     // it must be unloaded already in PlayerLogout and accessed only for loggined player
+     //m_social = NULL;
+ 
+@@ -1247,6 +1265,8 @@ void Player::Update(uint32 p_time)
+     if (!IsInWorld())
+         return;
+ 
++    sAnticheatMgr->HandleHackDetectionTimer(this, p_time);
++
+     // undelivered mail
+     if (m_nextMailDelivereTime && m_nextMailDelivereTime <= time(NULL))
+     {
+@@ -1819,6 +1839,8 @@ void Player::TeleportOutOfMap(Map *oldMap)
+ 
+ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientation, uint32 options)
+ {
++    sAnticheatMgr->DisableAnticheatDetection(this,true);
++
+     if (!MapManager::IsValidMapCoord(mapid, x, y, z, orientation))
+     {
+         sLog->outError("TeleportTo: invalid map %d or absent instance template.", mapid);
+diff --git a/src/server/game/Entities/Player/Player.h b/src/server/game/Entities/Player/Player.h
+index caabac6..bbc61e7 100755
+--- a/src/server/game/Entities/Player/Player.h
++++ b/src/server/game/Entities/Player/Player.h
+@@ -986,6 +986,18 @@ class TradeData
+         uint64     m_items[TRADE_SLOT_COUNT];               // traded itmes from m_player side including non-traded slot
+ };
+ 
++struct AnticheatData
++{
++    uint32 lastOpcode;
++    MovementInfo lastMovementInfo;
++    bool disableACCheck;
++    uint32 disableACCheckTimer;
++    uint32 total_reports;
++    uint32 type_reports[5];
++    uint32 average;
++    uint64 creation_time;
++};
++
+ class Player : public Unit, public GridObject<Player>
+ {
+     friend class WorldSession;
+@@ -995,6 +1007,8 @@ class Player : public Unit, public GridObject<Player>
+         explicit Player (WorldSession *session);
+         ~Player ();
+ 
++        AnticheatData anticheatData;
++
+         void CleanupsBeforeDelete(bool finalCleanup = true);
+ 
+         static UpdateMask updateVisualBits;
+diff --git a/src/server/game/Entities/Unit/Unit.cpp b/src/server/game/Entities/Unit/Unit.cpp
+index 4f67d9c..7ab702c 100755
+--- a/src/server/game/Entities/Unit/Unit.cpp
++++ b/src/server/game/Entities/Unit/Unit.cpp
+@@ -16,6 +16,7 @@
+  * with this program. If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include "AnticheatMgr.h"
+ #include "Common.h"
+ #include "CreatureAIImpl.h"
+ #include "Log.h"
+@@ -11993,6 +11994,9 @@ void Unit::SetVisible(bool x)
+ 
+ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced)
+ {
++    if (this->ToPlayer())
++        sAnticheatMgr->DisableAnticheatDetection(this->ToPlayer());
++
+     int32 main_speed_mod  = 0;
+     float stack_bonus     = 1.0f;
+     float non_stack_bonus = 1.0f;
+@@ -15979,6 +15983,9 @@ void Unit::UpdateObjectVisibility(bool forced)
+ 
+ void Unit::KnockbackFrom(float x, float y, float speedXY, float speedZ)
+ {
++    if (this->ToPlayer())
++        sAnticheatMgr->DisableAnticheatDetection(this->ToPlayer());
++
+     Player *player = NULL;
+     if (GetTypeId() == TYPEID_PLAYER)
+         player = (Player*)this;
+diff --git a/src/server/game/Scripting/ScriptLoader.cpp b/src/server/game/Scripting/ScriptLoader.cpp
+index 794bb10..6103a5b 100755
+--- a/src/server/game/Scripting/ScriptLoader.cpp
++++ b/src/server/game/Scripting/ScriptLoader.cpp
+@@ -44,6 +44,7 @@ void AddSC_example_spell_scripts();
+ void AddSC_SmartSCripts();
+ 
+ //Commands
++void AddSC_anticheat_commandscript();
+ void AddSC_account_commandscript();
+ void AddSC_achievement_commandscript();
+ void AddSC_debug_commandscript();
+@@ -630,6 +631,7 @@ void AddSpellScripts()
+ 
+ void AddCommandScripts()
+ {
++    AddSC_anticheat_commandscript();
+     AddSC_account_commandscript();
+     AddSC_achievement_commandscript();
+     AddSC_debug_commandscript();
+diff --git a/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp b/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
+index ef82569..8258d45 100755
+--- a/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
++++ b/src/server/game/Server/Protocol/Handlers/MovementHandler.cpp
+@@ -16,6 +16,7 @@
+  * with this program. If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include "AnticheatMgr.h"
+ #include "Common.h"
+ #include "WorldPacket.h"
+ #include "WorldSession.h"
+@@ -339,6 +340,9 @@ void WorldSession::HandleMovementOpcodes(WorldPacket & recv_data)
+         plMover->SetInWater(!plMover->IsInWater() || plMover->GetBaseMap()->IsUnderWater(movementInfo.pos.GetPositionX(), movementInfo.pos.GetPositionY(), movementInfo.pos.GetPositionZ()));
+     }
+ 
++    if (plMover)
++        sAnticheatMgr->StartHackDetection(plMover, movementInfo, opcode);
++
+     /*----------------------*/
+ 
+     /* process position-change */
+diff --git a/src/server/game/Spells/SpellEffects.cpp b/src/server/game/Spells/SpellEffects.cpp
+index afd0b7d..83475cb 100755
+--- a/src/server/game/Spells/SpellEffects.cpp
++++ b/src/server/game/Spells/SpellEffects.cpp
+@@ -16,6 +16,7 @@
+  * with this program. If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include "AnticheatMgr.h"
+ #include "Common.h"
+ #include "DatabaseEnv.h"
+ #include "WorldPacket.h"
+@@ -6081,6 +6082,9 @@ void Spell::EffectCharge(SpellEffIndex /*effIndex*/)
+     if (!target)
+         return;
+ 
++    if (m_caster->ToPlayer())
++        sAnticheatMgr->DisableAnticheatDetection(m_caster->ToPlayer());
++
+     float x, y, z;
+     target->GetContactPoint(m_caster, x, y, z);
+     m_caster->GetMotionMaster()->MoveCharge(x, y, z);
+@@ -6094,6 +6098,9 @@ void Spell::EffectChargeDest(SpellEffIndex /*effIndex*/)
+ {
+     if (m_targets.HasDst())
+     {
++        if (m_caster->ToPlayer())
++            sAnticheatMgr->DisableAnticheatDetection(m_caster->ToPlayer());
++
+         float x, y, z;
+         m_targets.m_dstPos.GetPosition(x, y, z);
+         m_caster->GetMotionMaster()->MoveCharge(x, y, z);
+@@ -6153,6 +6160,9 @@ void Spell::EffectKnockBack(SpellEffIndex effIndex)
+ 
+ void Spell::EffectLeapBack(SpellEffIndex effIndex)
+ {
++    if (m_caster->ToPlayer())
++        sAnticheatMgr->DisableAnticheatDetection(m_caster->ToPlayer());
++
+     float speedxy = float(m_spellInfo->EffectMiscValue[effIndex])/10;
+     float speedz = float(damage/10);
+     if (!speedxy)
+diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
+index 0f99fc3..bf5ba99 100755
+--- a/src/server/game/World/World.cpp
++++ b/src/server/game/World/World.cpp
+@@ -1179,6 +1179,9 @@ void World::LoadConfigSettings(bool reload)
+     // MySQL ping time interval
+     m_int_configs[CONFIG_DB_PING_INTERVAL] = sConfig->GetIntDefault("MaxPingTime", 30);
+ 
++    m_bool_configs[CONFIG_ANTICHEAT_ENABLE] = sConfig->GetBoolDefault("Anticheat.Enable", true);
++    m_int_configs[CONFIG_ANTICHEAT_REPORTS_INGAME_NOTIFICATION] = sConfig->GetIntDefault("Anticheat.ReportsForIngameWarnings", 70);
++
+     sScriptMgr->OnConfigLoad(reload);
+ }
+ 
+diff --git a/src/server/game/World/World.h b/src/server/game/World/World.h
+index 87c37b0..c5d595f 100755
+--- a/src/server/game/World/World.h
++++ b/src/server/game/World/World.h
+@@ -163,6 +163,7 @@ enum WorldBoolConfigs
+     CONFIG_ALLOW_TICKETS,
+     CONFIG_DBC_ENFORCE_ITEM_ATTRIBUTES,
+     CONFIG_PRESERVE_CUSTOM_CHANNELS,
++    CONFIG_ANTICHEAT_ENABLE,
+     BOOL_CONFIG_VALUE_COUNT
+ };
+ 
+@@ -309,6 +310,7 @@ enum WorldIntConfigs
+     CONFIG_DB_PING_INTERVAL,
+     CONFIG_PRESERVE_CUSTOM_CHANNEL_DURATION,
+     CONFIG_PERSISTENT_CHARACTER_CLEAN_FLAGS,
++    CONFIG_ANTICHEAT_REPORTS_INGAME_NOTIFICATION,
+     INT_CONFIG_VALUE_COUNT
+ };
+ 
+diff --git a/src/server/scripts/Commands/CMakeLists.txt b/src/server/scripts/Commands/CMakeLists.txt
+index b688ee3..64f5609 100644
+--- a/src/server/scripts/Commands/CMakeLists.txt
++++ b/src/server/scripts/Commands/CMakeLists.txt
+@@ -1,5 +1,6 @@
+ set(scripts_STAT_SRCS
+   ${scripts_STAT_SRCS}
++  Commands/cs_anticheat.cpp
+   Commands/cs_account.cpp
+   Commands/cs_achievement.cpp
+   Commands/cs_gm.cpp
+diff --git a/src/server/scripts/Commands/cs_anticheat.cpp b/src/server/scripts/Commands/cs_anticheat.cpp
+new file mode 100644
+index 0000000..3407442
+--- /dev/null
++++ b/src/server/scripts/Commands/cs_anticheat.cpp
+@@ -0,0 +1,307 @@
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "ScriptMgr.h"
++#include "ObjectMgr.h"
++#include "Chat.h"
++
++class anticheat_commandscript : public CommandScript
++{
++public:
++    anticheat_commandscript() : CommandScript("anticheat_commandscript") { }
++
++    ChatCommand* GetCommands() const
++    {
++        static ChatCommand anticheatCommandTable[] =
++        {
++            { "global",         SEC_GAMEMASTER,     true,  &HandleAntiCheatGlobalCommand,         "", NULL },
++            { "player",         SEC_GAMEMASTER,     true,  &HandleAntiCheatPlayerCommand,         "", NULL },
++            { "delete",         SEC_ADMINISTRATOR,  true,  &HandleAntiCheatDeleteCommand,         "", NULL },
++            { "handle",         SEC_ADMINISTRATOR,  true,  &HandleAntiCheatHandleCommand,         "", NULL },
++            { "jail",           SEC_GAMEMASTER,     true,  &HandleAnticheatJailCommand,         "", NULL },
++            { "warn",           SEC_GAMEMASTER,     true,  &HandleAnticheatWarnCommand,         "", NULL },
++            { NULL,             0,                     false, NULL,                                           "", NULL }
++        };
++
++        static ChatCommand commandTable[] =
++        {
++            { "anticheat",      SEC_GAMEMASTER,     true, NULL,                     "",  anticheatCommandTable},
++            { NULL,             0,                  false, NULL,                               "", NULL }
++        };
++
++        return commandTable;
++    }
++
++    static bool HandleAnticheatWarnCommand(ChatHandler* handler, const char* args)
++    {
++        if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++            return false;
++
++        Player* pTarget = NULL;
++
++        std::string strCommand;
++
++        char* command = strtok((char*)args, " ");
++
++        if (command)
++        {
++            strCommand = command;
++            normalizePlayerName(strCommand);
++
++            pTarget = sObjectMgr->GetPlayer(strCommand.c_str()); //get player by name
++        }else
++            pTarget = handler->getSelectedPlayer();
++
++        if (!pTarget)
++            return false;
++
++        WorldPacket data;
++
++        // need copy to prevent corruption by strtok call in LineFromMessage original string
++        char* buf = strdup("The anticheat system has reported several times that you may be cheating. You will be monitored to confirm if this is accurate.");
++        char* pos = buf;
++
++        while (char* line = handler->LineFromMessage(pos))
++        {
++            handler->FillSystemMessageData(&data, line);
++            pTarget->GetSession()->SendPacket(&data);
++        }
++
++        free(buf);
++        return true;
++    }
++
++    static bool HandleAnticheatJailCommand(ChatHandler* handler, const char* args)
++    {
++        if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++            return false;
++
++        Player* pTarget = NULL;
++
++        std::string strCommand;
++
++        char* command = strtok((char*)args, " ");
++
++        if (command)
++        {
++            strCommand = command;
++            normalizePlayerName(strCommand);
++
++            pTarget = sObjectMgr->GetPlayer(strCommand.c_str()); //get player by name
++        }else
++            pTarget = handler->getSelectedPlayer();
++
++        if (!pTarget)
++        {
++            handler->SendSysMessage(LANG_PLAYER_NOT_FOUND);
++            handler->SetSentErrorMessage(true);
++            return false;
++        }
++
++        if (pTarget == handler->GetSession()->GetPlayer())
++            return false;
++
++        // teleport both to jail.
++        pTarget->TeleportTo(1,16226.5f,16403.6f,-64.5f,3.2f);
++        handler->GetSession()->GetPlayer()->TeleportTo(1,16226.5f,16403.6f,-64.5f,3.2f);
++
++        WorldLocation loc;
++
++        // the player should be already there, but no :(
++        // pTarget->GetPosition(&loc);
++
++        loc.m_mapId = 1;
++        loc.m_positionX = 16226.5f;
++        loc.m_positionY = 16403.6f;
++        loc.m_positionZ = -64.5f;
++        loc.m_orientation = 3.2f;
++
++        pTarget->SetHomebind(loc,876);
++        return true;
++    }
++
++    static bool HandleAntiCheatDeleteCommand(ChatHandler* handler, const char* args)
++    {
++        if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++            return false;
++
++        std::string strCommand;
++
++        char* command = strtok((char*)args, " "); //get entered name
++
++        if (!command)
++            return true;
++
++        strCommand = command;
++
++        if (strCommand.compare("deleteall") == 0)
++            CharacterDatabase.PExecute("DELETE FROM players_reports_status;");
++        else
++        {
++            normalizePlayerName(strCommand);
++            Player* pPlayer = sObjectMgr->GetPlayer(strCommand.c_str()); //get player by name
++
++            if (!pPlayer)
++                handler->PSendSysMessage("Player doesn't exist");
++            else
++                CharacterDatabase.PExecute("DELETE FROM players_reports_status WHERE guid=%u;",pPlayer->GetGUIDLow());
++        }
++
++        return true;
++    }
++
++    static bool HandleAntiCheatPlayerCommand(ChatHandler* handler, const char* args)
++    {
++        if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++            return false;
++
++        std::string strCommand;
++
++        char* command = strtok((char*)args, " ");
++
++        uint32 uiGUID = 0;
++        Player* player = NULL;
++
++        if (command)
++        {
++            strCommand = command;
++
++            normalizePlayerName(strCommand);
++            player = sObjectMgr->GetPlayer(strCommand.c_str()); //get player by name
++
++            if (player)
++                uiGUID = player->GetGUIDLow();
++        }else
++        {
++            player = handler->getSelectedPlayer();
++            if (player)
++                uiGUID = player->GetGUIDLow();
++        }
++
++        if (uiGUID == 0)
++        {
++            handler->PSendSysMessage("There is no player.");
++            return true;
++        }
++
++
++        uint32 average = player->anticheatData.average;
++        uint32 total_reports = player->anticheatData.total_reports;
++        uint32 speed_reports = player->anticheatData.type_reports[0];
++        uint32 fly_reports = player->anticheatData.type_reports[1];
++        uint32 jump_reports = player->anticheatData.type_reports[3];
++        uint32 waterwalk_reports = player->anticheatData.type_reports[2];
++        uint32 teleportplane_reports = player->anticheatData.type_reports[4];
++
++        handler->PSendSysMessage("Information about player %s",player->GetName());
++        handler->PSendSysMessage("Average: %u || Total Reports: %u ",average,total_reports);
++        handler->PSendSysMessage("Speed Reports: %u || Fly Reports: %u || Jump Reports: %u ",speed_reports,fly_reports,jump_reports);
++        handler->PSendSysMessage("Walk On Water Reports: %u  || Teleport To Plane Reports: %u",waterwalk_reports,teleportplane_reports);
++
++        return true;
++    }
++
++    static bool HandleAntiCheatHandleCommand(ChatHandler* handler, const char* args)
++    {
++        std::string strCommand;
++
++        char* command = strtok((char*)args, " ");
++
++        if (!command)
++            return true;
++
++        if (!handler->GetSession()->GetPlayer())
++            return true;
++
++        strCommand = command;
++
++        if (strCommand.compare("on") == 0)
++        {
++            sWorld->setBoolConfig(CONFIG_ANTICHEAT_ENABLE,true);
++            handler->SendSysMessage("The Anticheat System is now: Enabled!");
++        }
++        else if (strCommand.compare("off") == 0)
++        {
++            sWorld->setBoolConfig(CONFIG_ANTICHEAT_ENABLE,false);
++            handler->SendSysMessage("The Anticheat System is now: Disabled!");
++        }
++
++        return true;
++    }
++
++    static bool HandleAntiCheatGlobalCommand(ChatHandler* handler, const char* args)
++    {
++        if (!sWorld->getBoolConfig(CONFIG_ANTICHEAT_ENABLE))
++        {
++            handler->PSendSysMessage("The Anticheat System is disabled.");
++            return true;
++        }
++
++        QueryResult resultDB = CharacterDatabase.Query("SELECT guid,average,total_reports FROM players_reports_status WHERE total_reports != 0 ORDER BY average ASC LIMIT 3;");
++        if (!resultDB)
++        {
++            handler->PSendSysMessage("No players found.");
++            return true;
++        } else
++        {
++                handler->SendSysMessage("=============================");
++                handler->PSendSysMessage("Players with the lowest averages:");
++                do
++                {
++                    Field *fieldsDB = resultDB->Fetch();
++
++                    uint64 guid = fieldsDB[0].GetUInt64();
++                    uint32 average = fieldsDB[1].GetUInt32();
++                    uint32 total_reports = fieldsDB[2].GetUInt32();
++
++                     if (Player* player = sObjectMgr->GetPlayerByLowGUID(guid))
++                         handler->PSendSysMessage("Player: %s Average: %u Total Reports: %u",player->GetName(),average,total_reports);
++
++                } while (resultDB->NextRow());
++        }
++
++        resultDB = CharacterDatabase.Query("SELECT guid,average,total_reports FROM players_reports_status WHERE total_reports != 0 ORDER BY total_reports DESC LIMIT 3;");
++
++        // this should never happen
++        if (!resultDB)
++        {
++            handler->PSendSysMessage("No players found.");
++            return true;
++        } else
++        {
++            handler->SendSysMessage("=============================");
++            handler->PSendSysMessage("Players with the more reports:");
++            do
++            {
++                Field *fieldsDB = resultDB->Fetch();
++
++                uint64 guid = fieldsDB[0].GetUInt64();
++                uint32 average = fieldsDB[1].GetUInt32();
++                uint32 total_reports = fieldsDB[2].GetUInt32();
++
++                    if (Player* player = sObjectMgr->GetPlayerByLowGUID(guid))
++                        handler->PSendSysMessage("Player: %s Total Reports: %u Average: %u",player->GetName(),total_reports,average);
++
++            } while (resultDB->NextRow());
++        }
++
++        return true;
++    }
++};
++
++void AddSC_anticheat_commandscript()
++{
++    new anticheat_commandscript();
++}
+diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
+index 188d6d8..a61e35f 100644
+--- a/src/server/worldserver/worldserver.conf.dist
++++ b/src/server/worldserver/worldserver.conf.dist
+@@ -2737,4 +2737,18 @@ LevelReq.Auction = 1
+ LevelReq.Mail = 1
+ 
+ #
++
++#     Anticheat.Enable
++#        Description: Enables or disables the Anticheat System functionality
++#        Default:     1 - (Enabled)
++#                     0 - (Disabled)
++
++Anticheat.Enable = 1
++
++#     Anticheat.ReportsForIngameWarnings
++#        Description: How many reports the player must have to notify to GameMasters ingame when he generates a new report.
++#        Default:     70
++
++Anticheat.ReportsForIngameWarnings = 70
++
+ ###################################################################################################
+-- 
+1.7.3.1.msysgit.0
+
