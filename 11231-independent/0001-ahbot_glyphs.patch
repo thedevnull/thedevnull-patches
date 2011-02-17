@@ -1,0 +1,4574 @@
+From d5fc9d622ba5cdcfe8b5f792a02df88421f3c1b3 Mon Sep 17 00:00:00 2001
+From: thedevnull <daniellage18@gmail.com>
+Date: Thu, 17 Feb 2011 09:41:10 -0300
+Subject: [PATCH] ahbot_glyphs
+ Signed-off-by: thedevnull <daniellage18@gmail.com>
+
+---
+ doc/AuctionHouseBot.txt                            |  236 +++
+ sql/tools/setup_ahbot.sql                          |   71 +
+ .../AuctionHouseBot/AuctionHouseBot.cpp            | 1983 ++++++++++++++++++++
+ .../AuctionHouse/AuctionHouseBot/AuctionHouseBot.h | 1257 +++++++++++++
+ src/server/game/AuctionHouse/AuctionHouseMgr.cpp   |   11 +-
+ src/server/game/AuctionHouse/AuctionHouseMgr.h     |    2 +
+ src/server/game/CMakeLists.txt                     |    3 +
+ src/server/game/Chat/Chat.cpp                      |    1 +
+ src/server/game/Chat/Chat.h                        |    1 +
+ src/server/game/Chat/Commands/Level3.cpp           |  490 +++++
+ src/server/game/Mails/Mail.cpp                     |    8 +
+ .../Protocol/Handlers/AuctionHouseHandler.cpp      |    1 +
+ src/server/game/World/World.cpp                    |    5 +
+ src/server/worldserver/worldserver.conf.dist       |  283 +++
+ 14 files changed, 4349 insertions(+), 3 deletions(-)
+ create mode 100644 doc/AuctionHouseBot.txt
+ create mode 100644 sql/tools/setup_ahbot.sql
+ create mode 100644 src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
+ create mode 100644 src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
+
+diff --git a/doc/AuctionHouseBot.txt b/doc/AuctionHouseBot.txt
+new file mode 100644
+index 0000000..cc15a08
+--- /dev/null
++++ b/doc/AuctionHouseBot.txt
+@@ -0,0 +1,236 @@
++Populates the auction houses with items. It can make the game feel a bit more
++like official on small servers. Items and prices are chosen randomly based on
++the parameters you define. If an auction expires, auctions are deleted quietly.
++AHBot will not buy it's own items, and will not receive mail from the AH
++or get returned mail.
++
++===============================================================================
++~~HOW TO CONFIGURE~~
++===============================================================================
++Step 1.) Create a character that you are going to use as the auction house bot
++         character. This character will be the auction's owner for all the
++         items created by the bot.
++Step 2.) Go into the realm database and note the account number for the
++         character.
++Step 3.) Go into the characters database and note the character's GUID.
++Step 4.) Log in at least once with this character.
++         (Do not change the configuration before this)
++Step 5.) Tune the configuration options in the configuration file and the
++         Database.
++
++#These are the settings in the configuration file:
++AuctionHouseBot.DEBUG = 0
++AuctionHouseBot.EnableSeller = 0
++AuctionHouseBot.EnableBuyer = 0
++AuctionHouseBot.UseBuyPriceForSeller = 0
++AuctionHouseBot.UseBuyPriceForBuyer = 0
++AuctionHouseBot.Account = 0
++AuctionHouseBot.GUID = 0
++AuctionHouseBot.ItemsPerCycle = 200
++
++AuctionHouseBot.DEBUG enables (1) or disables (0) Debug output
++AuctionHouseBot.EnableSeller enables (1) or disables (0) the Seller
++AuctionHouseBot.EnableBuyer enables (1) or disables (0) the Buyer
++AuctionHouseBot.UseBuyPriceForSeller Use SellPrice (0) or BuyPrice (1) for determining prices
++AuctionHouseBot.UseBuyPriceForBuyer Use SellPrice (0) or BuyPrice (1) for determining prices
++AuctionHouseBot.Account is the account number (in realmd->account table) of the player you want to run as the auction bot. Note: a value of 0 will disable the bot.
++AuctionHouseBot.GUID is the GUID (in characters->characters table) of the player you want to run as the auction bot. Note: a value of 0 will disable the bot.
++AuctionHouseBot.ItemsPerCycle determines how many items are added each time AHBot is run (once per minute, by default)
++
++#These are the Filters For filtering certain items/trade goods from the AH
++AuctionHouseBot.VendorItems = 0
++AuctionHouseBot.VendorTradeGoods = 0
++AuctionHouseBot.LootItems = 1
++AuctionHouseBot.LootTradeGoods = 1
++AuctionHouseBot.OtherItems = 0
++AuctionHouseBot.OtherTradeGoods = 0
++AuctionHouseBot.No_Bind = 1
++AuctionHouseBot.Bind_When_Picked_Up = 0
++AuctionHouseBot.Bind_When_Equipped = 1
++AuctionHouseBot.Bind_When_Use = 1
++AuctionHouseBot.Bind_Quest_Item = 0
++AuctionHouseBot.DisableBeta_PTR_Unused = 0
++AuctionHouseBot.DisablePermEnchant = 0
++AuctionHouseBot.DisableConjured = 0
++AuctionHouseBot.DisableGems = 0
++AuctionHouseBot.DisableMoney = 0
++AuctionHouseBot.DisableMoneyLoot = 0
++AuctionHouseBot.DisableLootable = 0
++AuctionHouseBot.DisableKeys = 0
++AuctionHouseBot.DisableDuration = 0
++AuctionHouseBot.DisableBOP_Or_Quest_NoReqLevel = 0
++
++AuctionHouseBot.VendorItems is a boolean value (0 or 1) that indicates whether to include Vendor only items
++AuctionHouseBot.VendorTradeGoods is a boolean value (0 or 1) that indicates whether to include Vendor only Trade Goods
++AuctionHouseBot.LootItems  is a boolean value (0 or 1) that indicates whether to include Loot/Fish/Skin/etc. only items
++AuctionHouseBot.LootTradeGoods  is a boolean value (0 or 1) that indicates whether to include Loot/Fish/Skin/etc. only Trade Goods
++AuctionHouseBot.OtherItems  is a boolean value (0 or 1) that indicates whether to include Other items not covered by the first 2
++AuctionHouseBot.OtherTradeGoods  is a boolean value (0 or 1) that indicates whether to include Other Trade Goods not covered by the first 2
++AuctionHouseBot.No_Bind is a boolean value (0 or 1) that indicates whether to include items with a bonding of 0
++AuctionHouseBot.Bind_When_Picked_Up = is a boolean value (0 or 1) that indicates whether to include items with a bonding of 1
++AuctionHouseBot.Bind_When_Equipped = is a boolean value (0 or 1) that indicates whether to include items with a bonding of 2
++AuctionHouseBot.Bind_When_Use = is a boolean value (0 or 1) that indicates whether to include items with a bonding of 3
++AuctionHouseBot.Bind_Quest_Item = is a boolean value (0 or 1) that indicates whether to include items with a bonding of 4
++AuctionHouseBot.DisableBeta_PTR_Unused is a boolean value (0 or 1) that will Disable certain items that are usually unavailable to Players
++AuctionHouseBot.DisablePermEnchant is a boolean value (0 or 1) that will Disable Items with a Permanent Enchantment
++AuctionHouseBot.DisableConjured is a boolean value (0 or 1) that will Disable Conjured Items
++AuctionHouseBot.DisableGems is a boolean value (0 or 1) that will Disable Gems
++AuctionHouseBot.DisableMoney is a boolean value (0 or 1) that will Disable Items that are used as money
++AuctionHouseBot.DisableMoneyLoot is a boolean value (0 or 1) that will Disable Items that have Money as a loot
++AuctionHouseBot.DisableLootable is a boolean value (0 or 1) that will Disable Items that have other items as loot
++AuctionHouseBot.DisableKeys is a boolean value (0 or 1) that will Disable Items that are keys
++AuctionHouseBot.DisableDuration is a boolean value (0 or 1) that will Disable Items with a duration
++AuctionHouseBot.DisableBOP_Or_Quest_NoReqLevel is a boolean value (0 or 1) that will Disable items that are BOP or Quest Item with a Required level that is less than the Item Level
++
++#These Filters are boolean (0 or 1) and will disable items that are
++#specifically meant for the Class named.
++#(UnusedClass is Class 10, which was skipped for some reason)
++AuctionHouseBot.DisableWarriorItems = 0
++AuctionHouseBot.DisablePaladinItems = 0
++AuctionHouseBot.DisableHunterItems = 0
++AuctionHouseBot.DisableRogueItems = 0
++AuctionHouseBot.DisablePriestItems = 0
++AuctionHouseBot.DisableDKItems = 0
++AuctionHouseBot.DisableShamanItems = 0
++AuctionHouseBot.DisableMageItems = 0
++AuctionHouseBot.DisableWarlockItems = 0
++AuctionHouseBot.DisableUnusedClassItems = 0
++AuctionHouseBot.DisableDruidItems = 0
++
++#These are the Filters For filtering certain items/trade goods from the AH
++AuctionHouseBot.DisableItemsBelowLevel = 0
++AuctionHouseBot.DisableItemsAboveLevel = 0
++AuctionHouseBot.DisableTGsBelowLevel = 0
++AuctionHouseBot.DisableTGsAboveLevel = 0
++AuctionHouseBot.DisableItemsBelowGUID = 0
++AuctionHouseBot.DisableItemsAboveGUID = 0
++AuctionHouseBot.DisableTGsBelowGUID = 0
++AuctionHouseBot.DisableTGsAboveGUID = 0
++AuctionHouseBot.DisableItemsBelowReqLevel = 0
++AuctionHouseBot.DisableItemsAboveReqLevel = 0
++AuctionHouseBot.DisableTGsBelowReqLevel = 0
++AuctionHouseBot.DisableTGsAboveReqLevel = 0
++AuctionHouseBot.DisableItemsBelowReqSkillRank = 0
++AuctionHouseBot.DisableItemsAboveReqSkillRank = 0
++AuctionHouseBot.DisableTGsBelowReqSkillRank = 0
++AuctionHouseBot.DisableTGsAboveReqSkillRank = 0
++
++#These are the settings in the Database:
++#Each Auctionhouse has it's own set of these
++
++MinItems = 0
++#The Minimum number of items you want to keep in the auction houses.
++#(default 0 - minimum will be the same as maximum).
++#If it is higher than the value of the corresponding maxItems setting,
++#it will be set down to match the maxItems setting.
++
++MaxItems = 0
++#The Maximum number of items you want to keep in the auction houses.
++
++#These must add up to 100 each one is the percentage
++#of the auction items that should be trade goods of
++#that quality. A value of 0 will disable.
++
++PercentGreyTradeGoods = 0
++PercentWhiteTradeGoods = 27
++PercentGreenTradeGoods = 12
++PercentBlueTradeGoods = 10
++PercentPurpleTradeGoods = 1
++PercentOrangeTradeGoods = 0
++PercentYellowTradeGoods = 0
++
++PercentGreyItems = 0
++PercentWhiteItems = 10
++PercentGreenItems = 30
++PercentBlueItems = 8
++PercentPurpleItems = 2
++PercentOrangeItems = 0
++PercentYellowItems = 0
++
++#MinPrice(Color)    is the minimum price adjustment for items. For example the default is 150, which means 150%. So if an item vendors for 1g it would go to auction for a minimum of 1.5g.
++#MaxPrice(Color)    is the maximum price adjustment for items.
++#MinBidPrice(Color) these two control the starting bid as a percent of the buyout price. For example, if MinBidPrice is 30 and MaxBidPrice is 80 the starting bid for the auction will randomly be between 30-80% of the randomly chosen buyout price.
++#MaxBidPrice(Color) these two control the starting bid as a percent of the buyout price. For example, if MinBidPrice is 30 and MaxBidPrice is 80 the starting bid for the auction will randomly be between 30-80% of the randomly chosen buyout price.
++#MaxStack(Color)    is maximum stack size to create for this quality type. A value of zero will disable the maximum stack size for this quality allowing the bot to create stacks (of random size) of items as big as the item type allows.
++
++MinPriceGrey = 100
++MaxPriceGrey = 150
++MinBidPriceGrey = 70
++MaxBidPriceGrey = 100
++MaxStackGrey = 0
++MinPriceWhite = 150
++MaxPriceWhite = 250
++MinBidPriceWhite = 70
++MaxBidPriceWhite = 100
++MaxStackWhite = 0
++MinPriceGreen = 800
++MaxPriceGreen = 1400
++MinBidPriceGreen = 80
++MaxBidPriceGreen = 100
++MaxStackGreen = 0
++MinPriceBlue = 1250
++MaxPriceBlue = 1750
++MinBidPriceBlue = 75
++MaxBidPriceBlue = 100
++MaxStackBlue = 0
++MinPricePurple = 2250
++MaxPricePurple = 4550
++MinBidPricePurple = 80
++MaxBidPricePurple = 100
++MaxStackPurple = 0
++MinPriceOrange = 4250
++MaxPriceOrange = 5550
++MinBidPriceOrange = 80
++MaxBidPriceOrange = 100
++MaxStackOrange = 0
++MinPriceYellow = 5250
++MaxPriceYellow = 6550
++MinBidPriceYellow = 80
++MaxBidPriceYellow = 100
++MaxStackYellow = 0
++
++#These are the multipliers that are applied to the vendor price for an item, that determines if AHBot will buy it or not.
++#1 means AHBot will pay the same as (or less than) a vendor would pay, 2 means up to twice as much, etc.
++
++BuyerPriceGrey = 1
++BuyerPriceWhite = 3
++BuyerPriceGreen = 5
++BuyerPriceBlue = 12
++BuyerPricePurple = 15
++BuyerPriceOrange = 20
++BuyerPriceYellow = 22
++
++#BuyerBiddingInterval is the time (in minutes) between bids.
++#BuyerBidsPerInterval is the number of bids the buyer will make in a cycle
++
++BuyerBiddingInterval = 1
++BuyerBidsPerInterval = 1
++
++
++
++How to use ahcommands from the console (CLI) or in game with GM level 3 players:
++ahbotoptions - will display usage instructions
++ahbotoptions help - will display the list of commands
++
++ahexpire - will expire all the auctions in the requested auction house that were created by AHBot.
++minitems - will set the minimum number of items in the AH before it starts being filled again.
++maxitems - will set the maximum number of items in the AH.
++percentages - will set the percentage of each quality in the AH
++minprice - will set the minimum price multiplier for auctions.
++maxprice - will set the maximum price multiplier for auctions.
++minbidprice - will set the minimum starting bid as a percent of the buyout price for auctions.
++maxbidprice - will set the maximum starting bid as a percent of the buyout price for auctions.
++maxstack - will set the maximum number of items in stacks for auctions. 0 will set the maximum to the maximum for that item type.
++buyerprice - will set the bid price multiplier for auctions.
++biddinginterval - will set the number of minutes between bids on auctions.
++bidsperinterval - will set the number of bids to enter per cycle.
++
++The auction house IDs are:
++2 - Alliance
++6 - Horde
++7 - Neutral
++
++
++AHBot Originally made by Chris K. Currently maintained by Paradox
++Much thanks to Chris K, grether and Dolomit6!
++AHBot Now includes AHBuyer created by Kerbe as a derivative of AHBot, and later modified by Paradox
+diff --git a/sql/tools/setup_ahbot.sql b/sql/tools/setup_ahbot.sql
+new file mode 100644
+index 0000000..63b9a6d
+--- /dev/null
++++ b/sql/tools/setup_ahbot.sql
+@@ -0,0 +1,71 @@
++CREATE TABLE `auctionhousebot` (
++    `auctionhouse` INT(11) NOT NULL DEFAULT '0' COMMENT 'mapID of the auctionhouse.',
++    `name` CHAR(25) NULL DEFAULT NULL COMMENT 'Text name of the auctionhouse.',
++    `minitems` INT(11) NULL DEFAULT '0' COMMENT 'This is the minimum number of items you want to keep in the auction house. a 0 here will make it the same as the maximum.',
++    `maxitems` INT(11) NULL DEFAULT '0' COMMENT 'This is the number of items you want to keep in the auction house.',
++    `percentgreytradegoods` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the Grey Trade Goods auction items',
++    `percentwhitetradegoods` INT(11) NULL DEFAULT '27' COMMENT 'Sets the percentage of the White Trade Goods auction items',
++    `percentgreentradegoods` INT(11) NULL DEFAULT '12' COMMENT 'Sets the percentage of the Green Trade Goods auction items',
++    `percentbluetradegoods` INT(11) NULL DEFAULT '10' COMMENT 'Sets the percentage of the Blue Trade Goods auction items',
++    `percentpurpletradegoods` INT(11) NULL DEFAULT '1' COMMENT 'Sets the percentage of the Purple Trade Goods auction items',
++    `percentorangetradegoods` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the Orange Trade Goods auction items',
++    `percentyellowtradegoods` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the Yellow Trade Goods auction items',
++    `percentgreyitems` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the non trade Grey auction items',
++    `percentwhiteitems` INT(11) NULL DEFAULT '10' COMMENT 'Sets the percentage of the non trade White auction items',
++    `percentgreenitems` INT(11) NULL DEFAULT '30' COMMENT 'Sets the percentage of the non trade Green auction items',
++    `percentblueitems` INT(11) NULL DEFAULT '8' COMMENT 'Sets the percentage of the non trade Blue auction items',
++    `percentpurpleitems` INT(11) NULL DEFAULT '2' COMMENT 'Sets the percentage of the non trade Purple auction items',
++    `percentorangeitems` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the non trade Orange auction items',
++    `percentyellowitems` INT(11) NULL DEFAULT '0' COMMENT 'Sets the percentage of the non trade Yellow auction items',
++    `minpricegrey` INT(11) NULL DEFAULT '100' COMMENT 'Minimum price of Grey items (percentage).',
++    `maxpricegrey` INT(11) NULL DEFAULT '150' COMMENT 'Maximum price of Grey items (percentage).',
++    `minpricewhite` INT(11) NULL DEFAULT '150' COMMENT 'Minimum price of White items (percentage).',
++    `maxpricewhite` INT(11) NULL DEFAULT '250' COMMENT 'Maximum price of White items (percentage).',
++    `minpricegreen` INT(11) NULL DEFAULT '800' COMMENT 'Minimum price of Green items (percentage).',
++    `maxpricegreen` INT(11) NULL DEFAULT '1400' COMMENT 'Maximum price of Green items (percentage).',
++    `minpriceblue` INT(11) NULL DEFAULT '1250' COMMENT 'Minimum price of Blue items (percentage).',
++    `maxpriceblue` INT(11) NULL DEFAULT '1750' COMMENT 'Maximum price of Blue items (percentage).',
++    `minpricepurple` INT(11) NULL DEFAULT '2250' COMMENT 'Minimum price of Purple items (percentage).',
++    `maxpricepurple` INT(11) NULL DEFAULT '4550' COMMENT 'Maximum price of Purple items (percentage).',
++    `minpriceorange` INT(11) NULL DEFAULT '3250' COMMENT 'Minimum price of Orange items (percentage).',
++    `maxpriceorange` INT(11) NULL DEFAULT '5550' COMMENT 'Maximum price of Orange items (percentage).',
++    `minpriceyellow` INT(11) NULL DEFAULT '5250' COMMENT 'Minimum price of Yellow items (percentage).',
++    `maxpriceyellow` INT(11) NULL DEFAULT '6550' COMMENT 'Maximum price of Yellow items (percentage).',
++    `minbidpricegrey` INT(11) NULL DEFAULT '70' COMMENT 'Starting bid price of Grey items as a percentage of the randomly chosen buyout price. Default: 70',
++    `maxbidpricegrey` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Grey items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpricewhite` INT(11) NULL DEFAULT '70' COMMENT 'Starting bid price of White items as a percentage of the randomly chosen buyout price. Default: 70',
++    `maxbidpricewhite` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of White items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpricegreen` INT(11) NULL DEFAULT '80' COMMENT 'Starting bid price of Green items as a percentage of the randomly chosen buyout price. Default: 80',
++    `maxbidpricegreen` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Green items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpriceblue` INT(11) NULL DEFAULT '75' COMMENT 'Starting bid price of Blue items as a percentage of the randomly chosen buyout price. Default: 75',
++    `maxbidpriceblue` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Blue items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpricepurple` INT(11) NULL DEFAULT '80' COMMENT 'Starting bid price of Purple items as a percentage of the randomly chosen buyout price. Default: 80',
++    `maxbidpricepurple` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Purple items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpriceorange` INT(11) NULL DEFAULT '80' COMMENT 'Starting bid price of Orange items as a percentage of the randomly chosen buyout price. Default: 80',
++    `maxbidpriceorange` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Orange items as a percentage of the randomly chosen buyout price. Default: 100',
++    `minbidpriceyellow` INT(11) NULL DEFAULT '80' COMMENT 'Starting bid price of Yellow items as a percentage of the randomly chosen buyout price. Default: 80',
++    `maxbidpriceyellow` INT(11) NULL DEFAULT '100' COMMENT 'Starting bid price of Yellow items as a percentage of the randomly chosen buyout price. Default: 100',
++    `maxstackgrey` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackwhite` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackgreen` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackblue` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackpurple` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackorange` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `maxstackyellow` INT(11) NULL DEFAULT '0' COMMENT 'Stack size limits for item qualities - a value of 0 will disable a maximum stack size for that quality, which will allow the bot to create items in stack as large as the item allows.',
++    `buyerpricegrey` INT(11) NULL DEFAULT '1' COMMENT 'Multiplier to vendorprice when buying grey items from auctionhouse',
++    `buyerpricewhite` INT(11) NULL DEFAULT '3' COMMENT 'Multiplier to vendorprice when buying white items from auctionhouse',
++    `buyerpricegreen` INT(11) NULL DEFAULT '5' COMMENT 'Multiplier to vendorprice when buying green items from auctionhouse',
++    `buyerpriceblue` INT(11) NULL DEFAULT '12' COMMENT 'Multiplier to vendorprice when buying blue items from auctionhouse',
++    `buyerpricepurple` INT(11) NULL DEFAULT '15' COMMENT 'Multiplier to vendorprice when buying purple items from auctionhouse',
++    `buyerpriceorange` INT(11) NULL DEFAULT '20' COMMENT 'Multiplier to vendorprice when buying orange items from auctionhouse',
++    `buyerpriceyellow` INT(11) NULL DEFAULT '22' COMMENT 'Multiplier to vendorprice when buying yellow items from auctionhouse',
++    `buyerbiddinginterval` INT(11) NULL DEFAULT '1' COMMENT 'Interval how frequently AHB bids on each AH. Time in minutes',
++    `buyerbidsperinterval` INT(11) NULL DEFAULT '1' COMMENT 'number of bids to put in per bidding interval',
++    PRIMARY KEY (`auctionhouse`)
++)
++ENGINE=InnoDB ROW_FORMAT=DEFAULT;
++
++insert  into `auctionhousebot`(`auctionhouse`,`name`,`minitems`,`maxitems`,`percentgreytradegoods`,`percentwhitetradegoods`,`percentgreentradegoods`,`percentbluetradegoods`,`percentpurpletradegoods`,`percentorangetradegoods`,`percentyellowtradegoods`,`percentgreyitems`,`percentwhiteitems`,`percentgreenitems`,`percentblueitems`,`percentpurpleitems`,`percentorangeitems`,`percentyellowitems`,`minpricegrey`,`maxpricegrey`,`minpricewhite`,`maxpricewhite`,`minpricegreen`,`maxpricegreen`,`minpriceblue`,`maxpriceblue`,`minpricepurple`,`maxpricepurple`,`minpriceorange`,`maxpriceorange`,`minpriceyellow`,`maxpriceyellow`,`minbidpricegrey`,`maxbidpricegrey`,`minbidpricewhite`,`maxbidpricewhite`,`minbidpricegreen`,`maxbidpricegreen`,`minbidpriceblue`,`maxbidpriceblue`,`minbidpricepurple`,`maxbidpricepurple`,`minbidpriceorange`,`maxbidpriceorange`,`minbidpriceyellow`,`maxbidpriceyellow`,`maxstackgrey`,`maxstackwhite`,`maxstackgreen`,`maxstackblue`,`maxstackpurple`,`maxstackorange`,`maxstackyellow`,`buyerpricegrey`,`buyerpricewhite`,`buyerpricegreen`,`buyerpriceblue`,`buyerpricepurple`,`buyerpriceorange`,`buyerpriceyellow`,`buyerbiddinginterval`,`buyerbidsperinterval`) values
++(2,'Alliance',250,250,0,27,12,10,1,0,0,0,10,30,8,2,0,0,100,150,150,250,800,1400,1250,1750,2250,4550,3250,5550,5250,6550,70,100,70,100,80,100,75,100,80,100,80,100,80,100,0,0,3,2,1,1,1,1,3,5,12,15,20,22,1,1),
++(6,'Horde',250,250,0,27,12,10,1,0,0,0,10,30,8,2,0,0,100,150,150,250,800,1400,1250,1750,2250,4550,3250,5550,5250,6550,70,100,70,100,80,100,75,100,80,100,80,100,80,100,0,0,3,2,1,1,1,1,3,5,12,15,20,22,1,1),
++(7,'Neutral',250,250,0,27,12,10,1,0,0,0,10,30,8,2,0,0,100,150,150,250,800,1400,1250,1750,2250,4550,3250,5550,5250,6550,70,100,70,100,80,100,75,100,80,100,80,100,80,100,0,0,3,2,1,1,1,1,3,5,12,15,20,22,1,1);
+\ No newline at end of file
+diff --git a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
+new file mode 100644
+index 0000000..0e25d02
+--- /dev/null
++++ b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.cpp
+@@ -0,0 +1,1983 @@
++/*
++ * Copyright (C) 2008-2010 Trinity <http://www.trinitycore.org/>
++ * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include "ObjectMgr.h"
++#include "AuctionHouseMgr.h"
++#include "AuctionHouseBot.h"
++#include <vector>
++
++using namespace std;
++vector<uint32> npcItems;
++vector<uint32> glyphItemsBin;
++vector<uint32> lootItems;
++vector<uint32> greyTradeGoodsBin;
++vector<uint32> whiteTradeGoodsBin;
++vector<uint32> greenTradeGoodsBin;
++vector<uint32> blueTradeGoodsBin;
++vector<uint32> purpleTradeGoodsBin;
++vector<uint32> orangeTradeGoodsBin;
++vector<uint32> yellowTradeGoodsBin;
++vector<uint32> greyItemsBin;
++vector<uint32> whiteItemsBin;
++vector<uint32> greenItemsBin;
++vector<uint32> blueItemsBin;
++vector<uint32> purpleItemsBin;
++vector<uint32> orangeItemsBin;
++vector<uint32> yellowItemsBin;
++
++AuctionHouseBot::AuctionHouseBot()
++{
++    debug_Out = false;
++    debug_Out_Filters = false;
++    AHBSeller = false;
++    AHBBuyer = false;
++
++    //Begin Filters
++
++    Vendor_Items = false;
++    Loot_Items = false;
++    Other_Items = false;
++    Vendor_TGs = false;
++    Loot_TGs = false;
++    Other_TGs = false;
++
++    No_Bind = false;
++    Bind_When_Picked_Up = false;
++    Bind_When_Equipped = false;
++    Bind_When_Use = false;
++    Bind_Quest_Item = false;
++
++    DisableBeta_PTR_Unused = false;
++    DisablePermEnchant = false;
++    DisableConjured = false;
++    DisableGems = false;
++    DisableMoney = false;
++    DisableMoneyLoot = false;
++    DisableLootable = false;
++    DisableKeys = false;
++    DisableDuration = false;
++    DisableBOP_Or_Quest_NoReqLevel = false;
++
++    DisableWarriorItems = false;
++    DisablePaladinItems = false;
++    DisableHunterItems = false;
++    DisableRogueItems = false;
++    DisablePriestItems = false;
++    DisableDKItems = false;
++    DisableShamanItems = false;
++    DisableMageItems = false;
++    DisableWarlockItems = false;
++    DisableUnusedClassItems = false;
++    DisableDruidItems = false;
++
++    DisableItemsBelowLevel = 0;
++    DisableItemsAboveLevel = 0;
++    DisableTGsBelowLevel = 0;
++    DisableTGsAboveLevel = 0;
++    DisableItemsBelowGUID = 0;
++    DisableItemsAboveGUID = 0;
++    DisableTGsBelowGUID = 0;
++    DisableTGsAboveGUID = 0;
++    DisableItemsBelowReqLevel = 0;
++    DisableItemsAboveReqLevel = 0;
++    DisableTGsBelowReqLevel = 0;
++    DisableTGsAboveReqLevel = 0;
++    DisableItemsBelowReqSkillRank = 0;
++    DisableItemsAboveReqSkillRank = 0;
++    DisableTGsBelowReqSkillRank = 0;
++    DisableTGsAboveReqSkillRank = 0;
++	//glyphs patch
++	SellGlyphs = false;
++	GlyphsCount = 0;
++	DisableGlyphBelowLevel = 0;
++	DisableGlyphAboveLevel = 0;
++	GlyphBuyOutPriceMin = 0;
++	GlyphBuyOutPriceMax = 0;
++	GlyphBidPriceMin = 0;
++	GlyphBidPriceMax = 0;
++	// <- end glyphs patch
++
++    //End Filters
++
++    _lastrun_a = time(NULL);
++    _lastrun_h = time(NULL);
++    _lastrun_n = time(NULL);
++
++    AllianceConfig = AHBConfig(2);
++    HordeConfig = AHBConfig(6);
++    NeutralConfig = AHBConfig(7);
++}
++
++AuctionHouseBot::~AuctionHouseBot()
++{
++}
++
++void AuctionHouseBot::addNewAuctions(Player *AHBplayer, AHBConfig *config)
++{
++	bool glyphMode = false;
++
++    if (!AHBSeller)
++    {
++        if (debug_Out) sLog->outError("AHSeller: Disabled");
++        return;
++    }
++
++    uint32 minItems = config->GetMinItems();
++    uint32 maxItems = config->GetMaxItems();
++
++    if (maxItems == 0)
++    {
++        //if (debug_Out) sLog->outString("AHSeller: Auctions disabled");
++        return;
++    }
++
++    AuctionHouseEntry const* ahEntry =  sAuctionMgr->GetAuctionHouseEntry(config->GetAHFID());
++    if (!ahEntry)
++    {
++        return;
++    }
++    AuctionHouseObject* auctionHouse =  sAuctionMgr->GetAuctionsMap(config->GetAHFID());
++    if (!auctionHouse)
++    {
++        return;
++    }
++
++    uint32 auctions = auctionHouse->Getcount();
++
++    uint32 items = 0;
++
++	if(SellGlyphs)
++	{
++		if(GlyphsCount <= 0)
++			GlyphsCount = 400;
++
++		if(auctions >= minItems)
++			glyphMode = true;
++
++		if(auctions >= (maxItems + GlyphsCount))
++			return;
++
++		if (((maxItems + GlyphsCount) - auctions) >= ItemsPerCycle)
++			items = ItemsPerCycle;
++		else
++			items = ((maxItems + GlyphsCount) - auctions);
++	}
++	else
++	{
++		if (auctions >= minItems)
++		{
++			//if (debug_Out) sLog.outString("AHSeller: Auctions above minimum");
++			return;
++		}
++
++		if (auctions >= maxItems)
++		{
++			//if (debug_Out) sLog.outString("AHSeller: Auctions at or above maximum");
++			return;
++		}
++
++		if ((maxItems - auctions) >= ItemsPerCycle)
++			items = ItemsPerCycle;
++		else
++			items = (maxItems - auctions);
++	}
++
++    if (debug_Out) sLog->outString("AHSeller: Adding %u Auctions", items);
++
++    uint32 AuctioneerGUID = 0;
++
++    switch (config->GetAHID())
++    {
++    case 2:
++        AuctioneerGUID = 79707; //Human in stormwind.
++        break;
++    case 6:
++        AuctioneerGUID = 4656; //orc in Orgrimmar
++        break;
++    case 7:
++        AuctioneerGUID = 23442; //goblin in GZ
++        break;
++    default:
++        if (debug_Out) sLog->outError("AHSeller: GetAHID() - Default switch reached");
++        AuctioneerGUID = 23442; //default to neutral 7
++        break;
++    }
++
++    if (debug_Out) sLog->outString("AHSeller: Current Auctineer GUID is %u", AuctioneerGUID);
++
++    uint32 greyTGcount = config->GetPercents(AHB_GREY_TG);
++    uint32 whiteTGcount = config->GetPercents(AHB_WHITE_TG);
++    uint32 greenTGcount = config->GetPercents(AHB_GREEN_TG);
++    uint32 blueTGcount = config->GetPercents(AHB_BLUE_TG);
++    uint32 purpleTGcount = config->GetPercents(AHB_PURPLE_TG);
++    uint32 orangeTGcount = config->GetPercents(AHB_ORANGE_TG);
++    uint32 yellowTGcount = config->GetPercents(AHB_YELLOW_TG);
++    uint32 greyIcount = config->GetPercents(AHB_GREY_I);
++    uint32 whiteIcount = config->GetPercents(AHB_WHITE_I);
++    uint32 greenIcount = config->GetPercents(AHB_GREEN_I);
++    uint32 blueIcount = config->GetPercents(AHB_BLUE_I);
++    uint32 purpleIcount = config->GetPercents(AHB_PURPLE_I);
++    uint32 orangeIcount = config->GetPercents(AHB_ORANGE_I);
++    uint32 yellowIcount = config->GetPercents(AHB_YELLOW_I);
++/*    uint32 total = greyTGcount + whiteTGcount + greenTGcount + blueTGcount
++        + purpleTGcount + orangeTGcount + yellowTGcount
++        + whiteIcount + greenIcount + blueIcount + purpleIcount
++        + orangeIcount + yellowIcount;
++*/
++    uint32 greyTGoods = config->GetItemCounts(AHB_GREY_TG);
++    uint32 whiteTGoods = config->GetItemCounts(AHB_WHITE_TG);
++    uint32 greenTGoods = config->GetItemCounts(AHB_GREEN_TG);
++    uint32 blueTGoods = config->GetItemCounts(AHB_BLUE_TG);
++    uint32 purpleTGoods = config->GetItemCounts(AHB_PURPLE_TG);
++    uint32 orangeTGoods = config->GetItemCounts(AHB_ORANGE_TG);
++    uint32 yellowTGoods = config->GetItemCounts(AHB_YELLOW_TG);
++
++    uint32 greyItems = config->GetItemCounts(AHB_GREY_I);
++    uint32 whiteItems = config->GetItemCounts(AHB_WHITE_I);
++    uint32 greenItems = config->GetItemCounts(AHB_GREEN_I);
++    uint32 blueItems = config->GetItemCounts(AHB_BLUE_I);
++    uint32 purpleItems = config->GetItemCounts(AHB_PURPLE_I);
++    uint32 orangeItems = config->GetItemCounts(AHB_ORANGE_I);
++    uint32 yellowItems = config->GetItemCounts(AHB_YELLOW_I);
++
++    if (debug_Out) sLog->outString("AHSeller: %u items", items);
++
++    // only insert a few at a time, so as not to peg the processor
++    for (uint32 cnt = 1; cnt <= items; cnt++)
++    {
++    if (debug_Out) sLog->outString("AHSeller: %u count", cnt);
++        uint32 itemID = 0;
++        uint32 itemColor = 99;
++        uint32 loopbreaker = 0;
++        while (itemID == 0 && loopbreaker <= 50)
++        {
++            ++loopbreaker;
++            uint32 choice = urand(0, 13);
++			if(glyphMode)
++				choice = 14;
++            itemColor = choice;
++            switch (choice)
++            {
++            case 0:
++                {
++                    if ((greyItemsBin.size() > 0) && (greyItems < greyIcount))
++                        itemID = greyItemsBin[urand(0, greyItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 1:
++                {
++                    if ((whiteItemsBin.size() > 0) && (whiteItems < whiteIcount))
++                        itemID = whiteItemsBin[urand(0, whiteItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 2:
++                {
++                    if ((greenItemsBin.size() > 0) && (greenItems < greenIcount))
++                        itemID = greenItemsBin[urand(0, greenItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 3:
++                {
++                    if ((blueItemsBin.size() > 0) && (blueItems < blueIcount))
++                        itemID = blueItemsBin[urand(0, blueItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 4:
++                {
++                    if ((purpleItemsBin.size() > 0) && (purpleItems < purpleIcount))
++                        itemID = purpleItemsBin[urand(0, purpleItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 5:
++                {
++                    if ((orangeItemsBin.size() > 0) && (orangeItems < orangeIcount))
++                        itemID = orangeItemsBin[urand(0, orangeItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 6:
++                {
++                    if ((yellowItemsBin.size() > 0) && (yellowItems < yellowIcount))
++                        itemID = yellowItemsBin[urand(0, yellowItemsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 7:
++                {
++                    if ((greyTradeGoodsBin.size() > 0) && (greyTGoods < greyTGcount))
++                        itemID = greyTradeGoodsBin[urand(0, greyTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 8:
++                {
++                    if ((whiteTradeGoodsBin.size() > 0) && (whiteTGoods < whiteTGcount))
++                        itemID = whiteTradeGoodsBin[urand(0, whiteTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 9:
++                {
++                    if ((greenTradeGoodsBin.size() > 0) && (greenTGoods < greenTGcount))
++                        itemID = greenTradeGoodsBin[urand(0, greenTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 10:
++                {
++                    if ((blueTradeGoodsBin.size() > 0) && (blueTGoods < blueTGcount))
++                        itemID = blueTradeGoodsBin[urand(0, blueTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 11:
++                {
++                    if ((purpleTradeGoodsBin.size() > 0) && (purpleTGoods < purpleTGcount))
++                        itemID = purpleTradeGoodsBin[urand(0, purpleTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 12:
++                {
++                    if ((orangeTradeGoodsBin.size() > 0) && (orangeTGoods < orangeTGcount))
++                        itemID = orangeTradeGoodsBin[urand(0, orangeTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++            case 13:
++                {
++                    if ((yellowTradeGoodsBin.size() > 0) && (yellowTGoods < yellowTGcount))
++                        itemID = yellowTradeGoodsBin[urand(0, yellowTradeGoodsBin.size() - 1)];
++                    else continue;
++                    break;
++                }
++			case 14:
++                {
++					if (glyphItemsBin.size() > 0)
++						itemID = glyphItemsBin[urand(0, glyphItemsBin.size() - 1)];
++					else continue;
++                    break;
++                }
++            default:
++                {
++                    if (debug_Out) sLog->outError("AHSeller: itemID Switch - Default Reached");
++                    break;
++                }
++            }
++
++            if (itemID == 0)
++            {
++                if (debug_Out) sLog->outError("AHSeller: Item::CreateItem() - ItemID is 0");
++                continue;
++            }
++
++            ItemPrototype const* prototype = sObjectMgr->GetItemPrototype(itemID);
++            if (prototype == NULL)
++            {
++                if (debug_Out) sLog->outError("AHSeller: Huh?!?! prototype == NULL");
++                continue;
++            }
++
++            Item* item = Item::CreateItem(itemID, 1, AHBplayer);
++            if (item == NULL)
++            {
++                if (debug_Out) sLog->outError("AHSeller: Item::CreateItem() returned NULL");
++                break;
++            }
++            item->AddToUpdateQueueOf(AHBplayer);
++
++            uint32 randomPropertyId = Item::GenerateItemRandomPropertyId(itemID);
++            if (randomPropertyId != 0)
++                item->SetItemRandomProperties(randomPropertyId);
++
++            uint64 buyoutPrice = 0;
++            uint64 bidPrice = 0;
++            uint32 stackCount = 1;
++
++            switch (SellMethod)
++            {
++            case 0:
++                buyoutPrice  = prototype->SellPrice;
++                break;
++            case 1:
++                buyoutPrice  = prototype->BuyPrice;
++                break;
++            }
++
++            if ((prototype->Quality >= 0) && (prototype->Quality <= AHB_MAX_QUALITY))
++            {
++				if(!glyphMode)
++				{
++					if (config->GetMaxStack(prototype->Quality) > 1 && item->GetMaxStackCount() > 1)
++						stackCount = urand(1, minValue(item->GetMaxStackCount(), config->GetMaxStack(prototype->Quality)));
++					else if (config->GetMaxStack(prototype->Quality) == 0 && item->GetMaxStackCount() > 1)
++						stackCount = urand(1, item->GetMaxStackCount());
++					else
++						stackCount = 1;
++					buyoutPrice *= urand(config->GetMinPrice(prototype->Quality), config->GetMaxPrice(prototype->Quality));
++					buyoutPrice /= 100;
++					bidPrice = buyoutPrice * urand(config->GetMinBidPrice(prototype->Quality), config->GetMaxBidPrice(prototype->Quality));
++					bidPrice /= 100;
++				}
++				else
++				{
++					buyoutPrice = urand(GlyphBuyOutPriceMin, GlyphBuyOutPriceMax);
++					bidPrice = urand(GlyphBidPriceMin, GlyphBidPriceMax);
++					if(buyoutPrice<bidPrice)
++						bidPrice = buyoutPrice - 1;
++					stackCount = 1;
++				}
++            }
++            else
++            {
++                // quality is something it shouldn't be, let's get out of here
++                if (debug_Out) sLog->outError("AHBuyer: Quality %u not Supported", prototype->Quality);
++                item->RemoveFromUpdateQueueOf(AHBplayer);
++                continue;
++            }
++
++            uint32 etime = urand(1,3);
++            switch(etime)
++            {
++            case 1:
++                etime = 43200;
++                break;
++            case 2:
++                etime = 86400;
++                break;
++            case 3:
++                etime = 172800;
++                break;
++            default:
++                etime = 86400;
++                break;
++            }
++            item->SetCount(stackCount);
++
++            uint32 dep =  sAuctionMgr->GetAuctionDeposit(ahEntry, etime, item, stackCount);
++
++            SQLTransaction trans = CharacterDatabase.BeginTransaction();
++            AuctionEntry* auctionEntry = new AuctionEntry;
++            auctionEntry->Id = sObjectMgr->GenerateAuctionID();
++            auctionEntry->auctioneer = AuctioneerGUID;
++            auctionEntry->item_guidlow = item->GetGUIDLow();
++            auctionEntry->item_template = item->GetEntry();
++            auctionEntry->owner = AHBplayer->GetGUIDLow();
++            auctionEntry->startbid = bidPrice * stackCount;
++            auctionEntry->buyout = buyoutPrice * stackCount;
++            auctionEntry->bidder = 0;
++            auctionEntry->bid = 0;
++            auctionEntry->deposit = dep;
++            auctionEntry->expire_time = (time_t) etime + time(NULL);
++            auctionEntry->auctionHouseEntry = ahEntry;
++            item->SaveToDB(trans);
++            item->RemoveFromUpdateQueueOf(AHBplayer);
++            sAuctionMgr->AddAItem(item);
++            auctionHouse->AddAuction(auctionEntry);
++            auctionEntry->SaveToDB(trans);
++            CharacterDatabase.CommitTransaction(trans);
++
++            switch(itemColor)
++            {
++            case 0:
++                ++greyItems;
++                break;
++            case 1:
++                ++whiteItems;
++                break;
++            case 2:
++                ++greenItems;
++                break;
++            case 3:
++                ++blueItems;
++                break;
++            case 4:
++                ++purpleItems;
++                break;
++            case 5:
++                ++orangeItems;
++                break;
++            case 6:
++                ++yellowItems;
++                break;
++            case 7:
++                ++greyTGoods;
++                break;
++            case 8:
++                ++whiteTGoods;
++                break;
++            case 9:
++                ++greenTGoods;
++                break;
++            case 10:
++                ++blueTGoods;
++                break;
++            case 11:
++                ++purpleTGoods;
++                break;
++            case 12:
++                ++orangeTGoods;
++                break;
++            case 13:
++                ++yellowTGoods;
++                break;
++            default:
++                break;
++            }
++        }
++    }
++}
++void AuctionHouseBot::addNewAuctionBuyerBotBid(Player *AHBplayer, AHBConfig *config, WorldSession *session)
++{
++    if (!AHBBuyer)
++    {
++        if (debug_Out) sLog->outError("AHBuyer: Disabled");
++        return;
++    }
++
++    QueryResult result = CharacterDatabase.PQuery("SELECT id FROM auctionhouse WHERE itemowner<>%u AND buyguid<>%u", AHBplayerGUID, AHBplayerGUID);
++
++    if (!result)
++        return;
++
++    if (result->GetRowCount() == 0)
++        return;
++
++    // Fetches content of selected AH
++    AuctionHouseObject* auctionHouse =  sAuctionMgr->GetAuctionsMap(config->GetAHFID());
++    vector<uint32> possibleBids;
++
++    do
++    {
++        uint32 tmpdata = result->Fetch()->GetUInt32();
++        possibleBids.push_back(tmpdata);
++    }while (result->NextRow());
++
++    for (uint32 count = 1; count <= config->GetBidsPerInterval(); ++count)
++    {
++        // Do we have anything to bid? If not, stop here.
++        if (possibleBids.empty())
++        {
++            //if (debug_Out) sLog->outString("AHBuyer: I have no items to bid on.");
++            count = config->GetBidsPerInterval();
++            continue;
++        }
++
++        // Choose random auction from possible auctions
++        uint32 vectorPos = urand(0, possibleBids.size() - 1);
++        vector<uint32>::iterator iter = possibleBids.begin();
++        advance(iter, vectorPos);
++
++        // from auctionhousehandler.cpp, creates auction pointer & player pointer
++        AuctionEntry* auction = auctionHouse->GetAuction(*iter);
++
++        // Erase the auction from the vector to prevent bidding on item in next iteration.
++        possibleBids.erase(iter);
++
++        if (!auction)
++            continue;
++
++        // get exact item information
++        Item *pItem =  sAuctionMgr->GetAItem(auction->item_guidlow);
++        if (!pItem)
++        {
++            if (debug_Out) sLog->outError("AHBuyer: Item %u doesn't exist, perhaps bought already?", auction->item_guidlow);
++            continue;
++        }
++
++        // get item prototype
++        ItemPrototype const* prototype = sObjectMgr->GetItemPrototype(auction->item_template);
++
++        // check which price we have to use, startbid or if it is bidded already
++        uint32 currentprice;
++        if (auction->bid)
++            currentprice = auction->bid;
++        else
++            currentprice = auction->startbid;
++
++        // Prepare portion from maximum bid
++        double bidrate = static_cast<double>(urand(1, 100)) / 100;
++        long double bidMax = 0;
++
++        // check that bid has acceptable value and take bid based on vendorprice, stacksize and quality
++        switch (BuyMethod)
++        {
++        case 0:
++            {
++                if ((prototype->Quality >= 0) && (prototype->Quality <= AHB_MAX_QUALITY))
++                {
++                    if (currentprice < prototype->SellPrice * pItem->GetCount() * config->GetBuyerPrice(prototype->Quality))
++                        bidMax = prototype->SellPrice * pItem->GetCount() * config->GetBuyerPrice(prototype->Quality);
++                }
++                else
++                {
++                    // quality is something it shouldn't be, let's get out of here
++                    if (debug_Out) sLog->outError("AHBuyer: Quality %u not Supported", prototype->Quality);
++                    continue;
++                }
++                break;
++            }
++        case 1:
++            {
++                if ((prototype->Quality >= 0) && (prototype->Quality <= AHB_MAX_QUALITY))
++                {
++                    if (currentprice < prototype->BuyPrice * pItem->GetCount() * config->GetBuyerPrice(prototype->Quality))
++                        bidMax = prototype->BuyPrice * pItem->GetCount() * config->GetBuyerPrice(prototype->Quality);
++                }
++                else
++                {
++                    // quality is something it shouldn't be, let's get out of here
++                    if (debug_Out) sLog->outError("AHBuyer: Quality %u not Supported", prototype->Quality);
++                    continue;
++                }
++                break;
++            }
++        }
++
++        // check some special items, and do recalculating to their prices
++        switch (prototype->Class)
++        {
++            // ammo
++        case 6:
++            bidMax = 0;
++            break;
++        default:
++            break;
++        }
++
++        if (bidMax == 0)
++        {
++            // quality check failed to get bidmax, let's get out of here
++            continue;
++        }
++
++        // Calculate our bid
++        long double bidvalue = currentprice + ((bidMax - currentprice) * bidrate);
++        // Convert to uint32
++        uint32 bidprice = static_cast<uint32>(bidvalue);
++
++        // Check our bid is high enough to be valid. If not, correct it to minimum.
++        if ((currentprice + auction->GetAuctionOutBid()) > bidprice)
++            bidprice = currentprice + auction->GetAuctionOutBid();
++
++        if (debug_Out)
++        {
++            sLog->outString("-------------------------------------------------");
++            sLog->outString("AHBuyer: Info for Auction #%u:", auction->Id);
++            sLog->outString("AHBuyer: AuctionHouse: %u", auction->GetHouseId());
++            sLog->outString("AHBuyer: Auctioneer: %u", auction->auctioneer);
++            sLog->outString("AHBuyer: Owner: %u", auction->owner);
++            sLog->outString("AHBuyer: Bidder: %u", auction->bidder);
++            sLog->outString("AHBuyer: Starting Bid: %u", auction->startbid);
++            sLog->outString("AHBuyer: Current Bid: %u", currentprice);
++            sLog->outString("AHBuyer: Buyout: %u", auction->buyout);
++            sLog->outString("AHBuyer: Deposit: %u", auction->deposit);
++            sLog->outString("AHBuyer: Expire Time: %u", auction->expire_time);
++            sLog->outString("AHBuyer: Bid Rate: %f", bidrate);
++            sLog->outString("AHBuyer: Bid Max: %f", bidMax);
++            sLog->outString("AHBuyer: Bid Value: %f", bidvalue);
++            sLog->outString("AHBuyer: Bid Price: %u", bidprice);
++            sLog->outString("AHBuyer: Item GUID: %u", auction->item_guidlow);
++            sLog->outString("AHBuyer: Item Template: %u", auction->item_template);
++            sLog->outString("AHBuyer: Item Info:");
++            sLog->outString("AHBuyer: Item ID: %u", prototype->ItemId);
++            sLog->outString("AHBuyer: Buy Price: %u", prototype->BuyPrice);
++            sLog->outString("AHBuyer: Sell Price: %u", prototype->SellPrice);
++            sLog->outString("AHBuyer: Bonding: %u", prototype->Bonding);
++            sLog->outString("AHBuyer: Quality: %u", prototype->Quality);
++            sLog->outString("AHBuyer: Item Level: %u", prototype->ItemLevel);
++            sLog->outString("AHBuyer: Ammo Type: %u", prototype->AmmoType);
++            sLog->outString("-------------------------------------------------");
++        }
++
++        // Check whether we do normal bid, or buyout
++        if ((bidprice < auction->buyout) || (auction->buyout == 0))
++        {
++
++            if (auction->bidder > 0)
++            {
++                if (auction->bidder == AHBplayer->GetGUIDLow())
++                {
++                    //pl->ModifyMoney(-int32(price - auction->bid));
++                }
++                else
++                {
++                    // mail to last bidder and return money
++                    SQLTransaction trans = CharacterDatabase.BeginTransaction();
++                    sAuctionMgr->SendAuctionOutbiddedMail(auction , bidprice, session->GetPlayer(), trans);
++                    CharacterDatabase.CommitTransaction(trans);
++                    //pl->ModifyMoney(-int32(price));
++                }
++           }
++
++            auction->bidder = AHBplayer->GetGUIDLow();
++            auction->bid = bidprice;
++
++            // Saving auction into database
++            CharacterDatabase.PExecute("UPDATE auctionhouse SET buyguid = '%u',lastbid = '%u' WHERE id = '%u'", auction->bidder, auction->bid, auction->Id);
++        }
++        else
++        {
++            SQLTransaction trans = CharacterDatabase.BeginTransaction();
++            //buyout
++            if ((auction->bidder) && (AHBplayer->GetGUIDLow() != auction->bidder))
++            {
++                sAuctionMgr->SendAuctionOutbiddedMail(auction, auction->buyout, session->GetPlayer(), trans);
++            }
++            auction->bidder = AHBplayer->GetGUIDLow();
++            auction->bid = auction->buyout;
++
++            // Send mails to buyer & seller
++            sAuctionMgr->SendAuctionSalePendingMail(auction, trans);
++            sAuctionMgr->SendAuctionSuccessfulMail(auction, trans);
++            sAuctionMgr->SendAuctionWonMail(auction, trans);
++            auction->DeleteFromDB( trans);
++            uint32 item_template = auction->item_template;
++            sAuctionMgr->RemoveAItem(auction->item_guidlow);
++            auctionHouse->RemoveAuction(auction, item_template);
++            CharacterDatabase.CommitTransaction(trans);
++        }
++    }
++}
++
++void AuctionHouseBot::Update()
++{
++    time_t _newrun = time(NULL);
++    if ((!AHBSeller) && (!AHBBuyer))
++        return;
++
++    WorldSession _session(AHBplayerAccount, NULL, SEC_PLAYER, true, 0, LOCALE_enUS, 0);
++    Player _AHBplayer(&_session);
++    _AHBplayer.Initialize(AHBplayerGUID);
++    sObjectAccessor->AddObject(&_AHBplayer);
++
++    // Add New Bids
++    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))
++    {
++        addNewAuctions(&_AHBplayer, &AllianceConfig);
++        if (((_newrun - _lastrun_a) >= (AllianceConfig.GetBiddingInterval() * MINUTE)) && (AllianceConfig.GetBidsPerInterval() > 0))
++        {
++            //if (debug_Out) sLog->outString("AHBuyer: %u seconds have passed since last bid", (_newrun - _lastrun_a));
++            //if (debug_Out) sLog->outString("AHBuyer: Bidding on Alliance Auctions");
++            addNewAuctionBuyerBotBid(&_AHBplayer, &AllianceConfig, &_session);
++            _lastrun_a = _newrun;
++        }
++
++        addNewAuctions(&_AHBplayer, &HordeConfig);
++        if (((_newrun - _lastrun_h) >= (HordeConfig.GetBiddingInterval() * MINUTE)) && (HordeConfig.GetBidsPerInterval() > 0))
++        {
++            //if (debug_Out) sLog->outString("AHBuyer: %u seconds have passed since last bid", (_newrun - _lastrun_h));
++            //if (debug_Out) sLog->outString("AHBuyer: Bidding on Horde Auctions");
++            addNewAuctionBuyerBotBid(&_AHBplayer, &HordeConfig, &_session);
++            _lastrun_h = _newrun;
++        }
++    }
++
++    addNewAuctions(&_AHBplayer, &NeutralConfig);
++    if (((_newrun - _lastrun_n) >= (NeutralConfig.GetBiddingInterval() * MINUTE)) && (NeutralConfig.GetBidsPerInterval() > 0))
++    {
++        //if (debug_Out) sLog->outString("AHBuyer: %u seconds have passed since last bid", (_newrun - _lastrun_n));
++        //if (debug_Out) sLog->outString("AHBuyer: Bidding on Neutral Auctions");
++        addNewAuctionBuyerBotBid(&_AHBplayer, &NeutralConfig, &_session);
++        _lastrun_n = _newrun;
++    }
++    sObjectAccessor->RemoveObject(&_AHBplayer);
++}
++
++void AuctionHouseBot::Initialize()
++{
++    debug_Out = sConfig->GetBoolDefault("AuctionHouseBot.DEBUG", false);
++    debug_Out_Filters = sConfig->GetBoolDefault("AuctionHouseBot.DEBUG_FILTERS", false);
++
++    AHBSeller = sConfig->GetBoolDefault("AuctionHouseBot.EnableSeller", false);
++    AHBBuyer = sConfig->GetBoolDefault("AuctionHouseBot.EnableBuyer", false);
++    SellMethod = sConfig->GetBoolDefault("AuctionHouseBot.UseBuyPriceForSeller", false);
++    BuyMethod = sConfig->GetBoolDefault("AuctionHouseBot.UseBuyPriceForBuyer", false);
++
++    AHBplayerAccount = sConfig->GetIntDefault("AuctionHouseBot.Account", 0);
++    AHBplayerGUID = sConfig->GetIntDefault("AuctionHouseBot.GUID", 0);
++    ItemsPerCycle = sConfig->GetIntDefault("AuctionHouseBot.ItemsPerCycle", 200);
++
++    //Begin Filters
++
++    Vendor_Items = sConfig->GetBoolDefault("AuctionHouseBot.VendorItems", false);
++    Loot_Items = sConfig->GetBoolDefault("AuctionHouseBot.LootItems", true);
++    Other_Items = sConfig->GetBoolDefault("AuctionHouseBot.OtherItems", false);
++    Vendor_TGs = sConfig->GetBoolDefault("AuctionHouseBot.VendorTradeGoods", false);
++    Loot_TGs = sConfig->GetBoolDefault("AuctionHouseBot.LootTradeGoods", true);
++    Other_TGs = sConfig->GetBoolDefault("AuctionHouseBot.OtherTradeGoods", false);
++
++    No_Bind = sConfig->GetBoolDefault("AuctionHouseBot.No_Bind", true);
++    Bind_When_Picked_Up = sConfig->GetBoolDefault("AuctionHouseBot.Bind_When_Picked_Up", false);
++    Bind_When_Equipped = sConfig->GetBoolDefault("AuctionHouseBot.Bind_When_Equipped", true);
++    Bind_When_Use = sConfig->GetBoolDefault("AuctionHouseBot.Bind_When_Use", true);
++    Bind_Quest_Item = sConfig->GetBoolDefault("AuctionHouseBot.Bind_Quest_Item", false);
++
++    DisableBeta_PTR_Unused = sConfig->GetBoolDefault("AuctionHouseBot.DisableBeta_PTR_Unused", false);
++    DisablePermEnchant = sConfig->GetBoolDefault("AuctionHouseBot.DisablePermEnchant", false);
++    DisableConjured = sConfig->GetBoolDefault("AuctionHouseBot.DisableConjured", false);
++    DisableGems = sConfig->GetBoolDefault("AuctionHouseBot.DisableGems", false);
++    DisableMoney = sConfig->GetBoolDefault("AuctionHouseBot.DisableMoney", false);
++    DisableMoneyLoot = sConfig->GetBoolDefault("AuctionHouseBot.DisableMoneyLoot", false);
++    DisableLootable = sConfig->GetBoolDefault("AuctionHouseBot.DisableLootable", false);
++    DisableKeys = sConfig->GetBoolDefault("AuctionHouseBot.DisableKeys", false);
++    DisableDuration = sConfig->GetBoolDefault("AuctionHouseBot.DisableDuration", false);
++    DisableBOP_Or_Quest_NoReqLevel = sConfig->GetBoolDefault("AuctionHouseBot.DisableBOP_Or_Quest_NoReqLevel", false);
++
++    DisableWarriorItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableWarriorItems", false);
++    DisablePaladinItems = sConfig->GetBoolDefault("AuctionHouseBot.DisablePaladinItems", false);
++    DisableHunterItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableHunterItems", false);
++    DisableRogueItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableRogueItems", false);
++    DisablePriestItems = sConfig->GetBoolDefault("AuctionHouseBot.DisablePriestItems", false);
++    DisableDKItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableDKItems", false);
++    DisableShamanItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableShamanItems", false);
++    DisableMageItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableMageItems", false);
++    DisableWarlockItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableWarlockItems", false);
++    DisableUnusedClassItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableUnusedClassItems", false);
++    DisableDruidItems = sConfig->GetBoolDefault("AuctionHouseBot.DisableDruidItems", false);
++
++    DisableItemsBelowLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsBelowLevel", 0);
++    DisableItemsAboveLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsAboveLevel", 0);
++    DisableTGsBelowLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsBelowLevel", 0);
++    DisableTGsAboveLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsAboveLevel", 0);
++    DisableItemsBelowGUID = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsBelowGUID", 0);
++    DisableItemsAboveGUID = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsAboveGUID", 0);
++    DisableTGsBelowGUID = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsBelowGUID", 0);
++    DisableTGsAboveGUID = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsAboveGUID", 0);
++    DisableItemsBelowReqLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsBelowReqLevel", 0);
++    DisableItemsAboveReqLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsAboveReqLevel", 0);
++    DisableTGsBelowReqLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsBelowReqLevel", 0);
++    DisableTGsAboveReqLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsAboveReqLevel", 0);
++    DisableItemsBelowReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsBelowReqSkillRank", 0);
++    DisableItemsAboveReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableItemsAboveReqSkillRank", 0);
++    DisableTGsBelowReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsBelowReqSkillRank", 0);
++    DisableTGsAboveReqSkillRank = sConfig->GetIntDefault("AuctionHouseBot.DisableTGsAboveReqSkillRank", 0);
++	SellGlyphs = sConfig->GetBoolDefault("AuctionHouseBot.SellGlyphs", false);
++	GlyphsCount = sConfig->GetIntDefault("AuctionHouseBot.GlyphsCount", 0);
++	DisableGlyphBelowLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableGlyphBelowLevel", 0);
++	DisableGlyphAboveLevel = sConfig->GetIntDefault("AuctionHouseBot.DisableGlyphAboveLevel", 0);
++	GlyphBuyOutPriceMin = sConfig->GetIntDefault("AuctionHouseBot.GlyphBuyOutPriceMin", 0);
++	GlyphBuyOutPriceMax = sConfig->GetIntDefault("AuctionHouseBot.GlyphBuyOutPriceMax", 0);
++	GlyphBidPriceMin = sConfig->GetIntDefault("AuctionHouseBot.GlyphBidPriceMin", 0);
++	GlyphBidPriceMax = sConfig->GetIntDefault("AuctionHouseBot.GlyphBidPriceMax", 0);
++
++    //End Filters
++    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))
++    {
++        LoadValues(&AllianceConfig);
++        LoadValues(&HordeConfig);
++    }
++    LoadValues(&NeutralConfig);
++
++    //
++    // check if the AHBot account/GUID in the config actually exists
++    //
++
++    if ((AHBplayerAccount != 0) || (AHBplayerGUID != 0))
++    {
++        QueryResult result = CharacterDatabase.PQuery("SELECT 1 FROM characters WHERE account = %u AND guid = %u", AHBplayerAccount, AHBplayerGUID);
++        if (!result)
++       {
++           sLog->outError("AuctionHouseBot: The account/GUID-information set for your AHBot is incorrect (account: %u guid: %u)", AHBplayerAccount, AHBplayerGUID);
++           return;
++        }
++    }
++
++    if (AHBSeller)
++    {
++        QueryResult results = QueryResult(NULL);
++        char npcQuery[] = "SELECT distinct item FROM npc_vendor";
++        results = WorldDatabase.Query(npcQuery);
++        if (results != NULL)
++        {
++            do
++            {
++                Field* fields = results->Fetch();
++                npcItems.push_back(fields[0].GetUInt32());
++
++            } while (results->NextRow());
++        }
++        else
++        {
++            if (debug_Out) sLog->outString("AuctionHouseBot: \"%s\" failed", npcQuery);
++        }
++
++		if(SellGlyphs)
++		{
++			if(DisableGlyphBelowLevel > 80)
++				DisableGlyphBelowLevel = 0;
++			if(DisableGlyphAboveLevel < DisableGlyphBelowLevel)
++				DisableGlyphAboveLevel = DisableGlyphBelowLevel;
++			if(DisableGlyphAboveLevel == 0)
++				DisableGlyphAboveLevel = 85;
++
++			if(GlyphBidPriceMin <= 0)
++				GlyphBidPriceMin = 8000;
++			if(GlyphBidPriceMin > GlyphBidPriceMax)
++				GlyphBidPriceMax = GlyphBidPriceMin;
++			if(GlyphBuyOutPriceMin <= 0)
++				GlyphBuyOutPriceMin = 10000;
++			if(GlyphBuyOutPriceMin > GlyphBuyOutPriceMax)
++				GlyphBuyOutPriceMax = GlyphBuyOutPriceMin;
++
++
++			results = WorldDatabase.PQuery("SELECT entry FROM item_template WHERE class = 16 AND RequiredLevel >= %u AND RequiredLevel <= %u", DisableGlyphBelowLevel, DisableGlyphAboveLevel);
++			if (results != NULL)
++			{
++				do
++				{
++					Field* fields = results->Fetch();
++					glyphItemsBin.push_back(fields[0].GetUInt32());
++
++				} while (results->NextRow());
++			}
++			else
++			{
++				if (debug_Out) sLog->outString("AuctionHouseBot: query glyphs failed");
++			}
++		}
++
++        char lootQuery[] = "SELECT item FROM creature_loot_template UNION "
++            "SELECT item FROM reference_loot_template UNION "
++            "SELECT item FROM disenchant_loot_template UNION "
++            "SELECT item FROM fishing_loot_template UNION "
++            "SELECT item FROM gameobject_loot_template UNION "
++            "SELECT item FROM item_loot_template UNION "
++            "SELECT item FROM milling_loot_template UNION "
++            "SELECT item FROM pickpocketing_loot_template UNION "
++            "SELECT item FROM prospecting_loot_template UNION "
++            "SELECT item FROM skinning_loot_template";
++
++        results = WorldDatabase.Query(lootQuery);
++        if (results != NULL)
++        {
++            do
++            {
++                Field* fields = results->Fetch();
++                lootItems.push_back(fields[0].GetUInt32());
++
++            } while (results->NextRow());
++        }
++        else
++        {
++            if (debug_Out) sLog->outString("AuctionHouseBot: \"%s\" failed", lootQuery);
++        }
++
++        for (uint32 itemID = 0; itemID < sItemStorage.MaxEntry; itemID++)
++        {
++            ItemPrototype const* prototype = sObjectMgr->GetItemPrototype(itemID);
++
++            if (prototype == NULL)
++                continue;
++
++            switch (prototype->Bonding)
++            {
++            case NO_BIND:
++                if (!No_Bind)
++                    continue;
++                break;
++            case BIND_WHEN_PICKED_UP:
++                if (!Bind_When_Picked_Up)
++                    continue;
++                break;
++            case BIND_WHEN_EQUIPED:
++                if (!Bind_When_Equipped)
++                    continue;
++                break;
++            case BIND_WHEN_USE:
++                if (!Bind_When_Use)
++                    continue;
++                break;
++            case BIND_QUEST_ITEM:
++                if (!Bind_Quest_Item)
++                    continue;
++                break;
++            default:
++                continue;
++                break;
++            }
++
++            switch (SellMethod)
++            {
++            case 0:
++                if (prototype->SellPrice == 0)
++                    continue;
++                break;
++            case 1:
++                if (prototype->BuyPrice == 0)
++                    continue;
++                break;
++            }
++
++            if ((prototype->Quality < 0) || (prototype->Quality > 6))
++                continue;
++
++            if ((Vendor_Items == 0) && !(prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isVendorItem = false;
++
++                for (unsigned int i = 0; (i < npcItems.size()) && (!isVendorItem); i++)
++                {
++                    if (itemID == npcItems[i])
++                        isVendorItem = true;
++                }
++
++                if (isVendorItem)
++                    continue;
++            }
++
++            if ((Vendor_TGs == 0) && (prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isVendorTG = false;
++
++                for (unsigned int i = 0; (i < npcItems.size()) && (!isVendorTG); i++)
++                {
++                    if (itemID == npcItems[i])
++                        isVendorTG = true;
++                }
++
++                if (isVendorTG)
++                    continue;
++            }
++
++            if ((Loot_Items == 0) && !(prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isLootItem = false;
++
++                for (unsigned int i = 0; (i < lootItems.size()) && (!isLootItem); i++)
++                {
++                    if (itemID == lootItems[i])
++                        isLootItem = true;
++                }
++
++                if (isLootItem)
++                    continue;
++            }
++
++            if ((Loot_TGs == 0) && (prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isLootTG = false;
++
++                for (unsigned int i = 0; (i < lootItems.size()) && (!isLootTG); i++)
++                {
++                    if (itemID == lootItems[i])
++                        isLootTG = true;
++                }
++
++                if (isLootTG)
++                    continue;
++            }
++
++            if ((Other_Items == 0) && !(prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isVendorItem = false;
++                bool isLootItem = false;
++
++                for (unsigned int i = 0; (i < npcItems.size()) && (!isVendorItem); i++)
++                {
++                    if (itemID == npcItems[i])
++                        isVendorItem = true;
++                }
++                for (unsigned int i = 0; (i < lootItems.size()) && (!isLootItem); i++)
++                {
++                    if (itemID == lootItems[i])
++                        isLootItem = true;
++                }
++                if ((!isLootItem) && (!isVendorItem))
++                    continue;
++            }
++
++            if ((Other_TGs == 0) && (prototype->Class == ITEM_CLASS_TRADE_GOODS))
++            {
++                bool isVendorTG = false;
++                bool isLootTG = false;
++
++                for (unsigned int i = 0; (i < npcItems.size()) && (!isVendorTG); i++)
++                {
++                    if (itemID == npcItems[i])
++                        isVendorTG = true;
++                }
++                for (unsigned int i = 0; (i < lootItems.size()) && (!isLootTG); i++)
++                {
++                    if (itemID == lootItems[i])
++                        isLootTG = true;
++                }
++                if ((!isLootTG) && (!isVendorTG))
++                    continue;
++            }
++
++             //TODO:Make list of items and create a vector
++            // Disable PTR/Beta/Unused items
++            if ((DisableBeta_PTR_Unused) && ((prototype->ItemId == 21878) || (prototype->ItemId == 27774) || (prototype->ItemId == 27811) || (prototype->ItemId == 28117) || (prototype->ItemId == 28112)))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (PTR/Beta/Unused Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable permanent enchants items
++            if ((DisablePermEnchant) && (prototype->Class == ITEM_CLASS_PERMANENT))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Permanent Enchant Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable conjured items
++            if ((DisableConjured) && (prototype->IsConjuredConsumable()))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Conjured Consumable)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable gems
++            if ((DisableGems) && (prototype->Class == ITEM_CLASS_GEM))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Gem)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable money
++            if ((DisableMoney) && (prototype->Class == ITEM_CLASS_MONEY))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Money)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable moneyloot
++            if ((DisableMoneyLoot) && (prototype->MinMoneyLoot > 0))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (MoneyLoot)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable lootable items
++            if ((DisableLootable) && (prototype->Flags & 4))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Lootable Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable Keys
++            if ((DisableKeys) && (prototype->Class == ITEM_CLASS_KEY))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Quest Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items with duration
++            if ((DisableDuration) && (prototype->Duration > 0))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Has a Duration)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items which are BOP or Quest Items and have a required level lower than the item level
++            if ((DisableBOP_Or_Quest_NoReqLevel) && ((prototype->Bonding == BIND_WHEN_PICKED_UP || prototype->Bonding == BIND_QUEST_ITEM) && (prototype->RequiredLevel < prototype->ItemLevel)))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (BOP or BQI and Required Level is less than Item Level)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Warrior
++            if ((DisableWarriorItems) && (prototype->AllowableClass == 1))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Warrior Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Paladin
++            if ((DisablePaladinItems) && (prototype->AllowableClass == 2))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Paladin Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Hunter
++            if ((DisableHunterItems) && (prototype->AllowableClass == 4))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Hunter Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Rogue
++            if ((DisableRogueItems) && (prototype->AllowableClass == 8))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Rogue Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Priest
++            if ((DisablePriestItems) && (prototype->AllowableClass == 16))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Priest Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for DK
++            if ((DisableDKItems) && (prototype->AllowableClass == 32))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (DK Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Shaman
++            if ((DisableShamanItems) && (prototype->AllowableClass == 64))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Shaman Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Mage
++            if ((DisableMageItems) && (prototype->AllowableClass == 128))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Mage Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Warlock
++            if ((DisableWarlockItems) && (prototype->AllowableClass == 256))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Warlock Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Unused Class
++            if ((DisableUnusedClassItems) && (prototype->AllowableClass == 512))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Unused Item)", prototype->ItemId);
++                continue;
++            }
++
++            // Disable items specifically for Druid
++            if ((DisableDruidItems) && (prototype->AllowableClass == 1024))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Druid Item)", prototype->ItemId);
++                continue;
++            }
++
++             // Disable Items below level X
++            if ((DisableItemsBelowLevel) && (prototype->Class != ITEM_CLASS_TRADE_GOODS) && (prototype->ItemLevel < DisableItemsBelowLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Item Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Items above level X
++            if ((DisableItemsAboveLevel) && (prototype->Class != ITEM_CLASS_TRADE_GOODS) && (prototype->ItemLevel > DisableItemsAboveLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Item Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++           // Disable Trade Goods below level X
++            if ((DisableTGsBelowLevel) && (prototype->Class == ITEM_CLASS_TRADE_GOODS) && (prototype->ItemLevel < DisableTGsBelowLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Trade Good %u disabled (Trade Good Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++           // Disable Trade Goods above level X
++            if ((DisableTGsAboveLevel) && (prototype->Class == ITEM_CLASS_TRADE_GOODS) && (prototype->ItemLevel > DisableTGsAboveLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Trade Good %u disabled (Trade Good Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Items below GUID X
++            if ((DisableItemsBelowGUID) && (prototype->Class != ITEM_CLASS_TRADE_GOODS) && (prototype->ItemId < DisableItemsBelowGUID))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Item Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Items above GUID X
++            if ((DisableItemsAboveGUID) && (prototype->Class != ITEM_CLASS_TRADE_GOODS) && (prototype->ItemId > DisableItemsAboveGUID))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Item Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Trade Goods below GUID X
++            if ((DisableTGsBelowGUID) && (prototype->Class == ITEM_CLASS_TRADE_GOODS) && (prototype->ItemId < DisableTGsBelowGUID))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Trade Good Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Trade Goods above GUID X
++            if ((DisableTGsAboveGUID) && (prototype->Class == ITEM_CLASS_TRADE_GOODS) && (prototype->ItemId > DisableTGsAboveGUID))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (Trade Good Level = %u)", prototype->ItemId, prototype->ItemLevel);
++                continue;
++            }
++
++            // Disable Items for level lower than X
++            if ((DisableItemsBelowReqLevel) && (prototype->RequiredLevel < DisableItemsBelowReqLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredLevel = %u)", prototype->ItemId, prototype->RequiredLevel);
++                continue;
++            }
++
++            // Disable Items for level higher than X
++            if ((DisableItemsAboveReqLevel) && (prototype->RequiredLevel > DisableItemsAboveReqLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredLevel = %u)", prototype->ItemId, prototype->RequiredLevel);
++                continue;
++            }
++
++            // Disable Trade Goods for level lower than X
++            if ((DisableTGsBelowReqLevel) && (prototype->RequiredLevel < DisableTGsBelowReqLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Trade Good %u disabled (RequiredLevel = %u)", prototype->ItemId, prototype->RequiredLevel);
++                continue;
++            }
++
++            // Disable Trade Goods for level higher than X
++            if ((DisableTGsAboveReqLevel) && (prototype->RequiredLevel > DisableTGsAboveReqLevel))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Trade Good %u disabled (RequiredLevel = %u)", prototype->ItemId, prototype->RequiredLevel);
++                continue;
++            }
++
++            // Disable Items that require skill lower than X
++            if ((DisableItemsBelowReqSkillRank) && (prototype->RequiredSkillRank < DisableItemsBelowReqSkillRank))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredSkillRank = %u)", prototype->ItemId, prototype->RequiredSkillRank);
++                continue;
++            }
++
++            // Disable Items that require skill higher than X
++            if ((DisableItemsAboveReqSkillRank) && (prototype->RequiredSkillRank > DisableItemsAboveReqSkillRank))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredSkillRank = %u)", prototype->ItemId, prototype->RequiredSkillRank);
++                continue;
++            }
++
++            // Disable Trade Goods that require skill lower than X
++            if ((DisableTGsBelowReqSkillRank) && (prototype->RequiredSkillRank < DisableTGsBelowReqSkillRank))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredSkillRank = %u)", prototype->ItemId, prototype->RequiredSkillRank);
++                continue;
++            }
++
++            // Disable Trade Goods that require skill higher than X
++            if ((DisableTGsAboveReqSkillRank) && (prototype->RequiredSkillRank > DisableTGsAboveReqSkillRank))
++            {
++                if (debug_Out_Filters) sLog->outString("AuctionHouseBot: Item %u disabled (RequiredSkillRank = %u)", prototype->ItemId, prototype->RequiredSkillRank);
++                continue;
++            }
++
++            switch (prototype->Quality)
++            {
++            case AHB_GREY:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    greyTradeGoodsBin.push_back(itemID);
++                else
++                    greyItemsBin.push_back(itemID);
++                break;
++
++            case AHB_WHITE:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    whiteTradeGoodsBin.push_back(itemID);
++                else
++                    whiteItemsBin.push_back(itemID);
++                break;
++
++            case AHB_GREEN:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    greenTradeGoodsBin.push_back(itemID);
++                else
++                    greenItemsBin.push_back(itemID);
++                break;
++
++            case AHB_BLUE:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    blueTradeGoodsBin.push_back(itemID);
++                else
++                    blueItemsBin.push_back(itemID);
++                break;
++
++            case AHB_PURPLE:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    purpleTradeGoodsBin.push_back(itemID);
++                else
++                    purpleItemsBin.push_back(itemID);
++                break;
++
++            case AHB_ORANGE:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    orangeTradeGoodsBin.push_back(itemID);
++                else
++                    orangeItemsBin.push_back(itemID);
++                break;
++
++            case AHB_YELLOW:
++                if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                    yellowTradeGoodsBin.push_back(itemID);
++                else
++                    yellowItemsBin.push_back(itemID);
++                break;
++            }
++        }
++
++        if ((greyTradeGoodsBin.size() == 0) &&
++            (whiteTradeGoodsBin.size() == 0) &&
++            (greenTradeGoodsBin.size() == 0) &&
++            (blueTradeGoodsBin.size() == 0) &&
++            (purpleTradeGoodsBin.size() == 0) &&
++            (orangeTradeGoodsBin.size() == 0) &&
++            (yellowTradeGoodsBin.size() == 0) &&
++            (greyItemsBin.size() == 0) &&
++            (whiteItemsBin.size() == 0) &&
++            (greenItemsBin.size() == 0) &&
++            (blueItemsBin.size() == 0) &&
++            (purpleItemsBin.size() == 0) &&
++            (orangeItemsBin.size() == 0) &&
++            (yellowItemsBin.size() == 0))
++        {
++            sLog->outError("AuctionHouseBot: No items");
++            AHBSeller = 0;
++        }
++
++        sLog->outString("AuctionHouseBot:");
++        sLog->outString("loaded %u grey trade goods", greyTradeGoodsBin.size());
++        sLog->outString("loaded %u white trade goods", whiteTradeGoodsBin.size());
++        sLog->outString("loaded %u green trade goods", greenTradeGoodsBin.size());
++        sLog->outString("loaded %u blue trade goods", blueTradeGoodsBin.size());
++        sLog->outString("loaded %u purple trade goods", purpleTradeGoodsBin.size());
++        sLog->outString("loaded %u orange trade goods", orangeTradeGoodsBin.size());
++        sLog->outString("loaded %u yellow trade goods", yellowTradeGoodsBin.size());
++        sLog->outString("loaded %u grey items", greyItemsBin.size());
++        sLog->outString("loaded %u white items", whiteItemsBin.size());
++        sLog->outString("loaded %u green items", greenItemsBin.size());
++        sLog->outString("loaded %u blue items", blueItemsBin.size());
++        sLog->outString("loaded %u purple items", purpleItemsBin.size());
++        sLog->outString("loaded %u orange items", orangeItemsBin.size());
++        sLog->outString("loaded %u yellow items", yellowItemsBin.size());
++		sLog->outString("loaded %u glyph items", glyphItemsBin.size());
++
++    }
++    sLog->outString("AuctionHouseBot and AuctionHouseBuyer have been loaded.");
++}
++
++void AuctionHouseBot::IncrementItemCounts(AuctionEntry* ah)
++{
++    // from auctionhousehandler.cpp, creates auction pointer & player pointer
++
++    // get exact item information
++    Item *pItem =  sAuctionMgr->GetAItem(ah->item_guidlow);
++    if (!pItem)
++    {
++        if (debug_Out) sLog->outError("AHBot: Item %u doesn't exist, perhaps bought already?", ah->item_guidlow);
++        return;
++    }
++
++    // get item prototype
++    ItemPrototype const* prototype = sObjectMgr->GetItemPrototype(ah->item_template);
++
++    AHBConfig *config;
++
++    FactionTemplateEntry const* u_entry = sFactionTemplateStore.LookupEntry(ah->GetHouseFaction());
++    if (!u_entry)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Neutral", ah->GetHouseFaction());
++        config = &NeutralConfig;
++    }
++    else if (u_entry->ourMask & FACTION_MASK_ALLIANCE)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Alliance", ah->GetHouseFaction());
++        config = &AllianceConfig;
++    }
++    else if (u_entry->ourMask & FACTION_MASK_HORDE)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Horde", ah->GetHouseFaction());
++        config = &HordeConfig;
++    }
++    else
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Neutral", ah->GetHouseFaction());
++        config = &NeutralConfig;
++    }
++
++    config->IncItemCounts(prototype->Class, prototype->Quality);
++}
++
++void AuctionHouseBot::DecrementItemCounts(AuctionEntry* ah, uint32 item_template)
++{
++    // get item prototype
++    ItemPrototype const* prototype = sObjectMgr->GetItemPrototype(item_template);
++
++    AHBConfig *config;
++
++    FactionTemplateEntry const* u_entry = sFactionTemplateStore.LookupEntry(ah->GetHouseFaction());
++    if (!u_entry)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Neutral", ah->GetHouseFaction());
++        config = &NeutralConfig;
++    }
++    else if (u_entry->ourMask & FACTION_MASK_ALLIANCE)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Alliance", ah->GetHouseFaction());
++        config = &AllianceConfig;
++    }
++    else if (u_entry->ourMask & FACTION_MASK_HORDE)
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Horde", ah->GetHouseFaction());
++        config = &HordeConfig;
++    }
++    else
++    {
++        if (debug_Out) sLog->outError("AHBot: %u returned as House Faction. Neutral", ah->GetHouseFaction());
++        config = &NeutralConfig;
++    }
++
++    config->DecItemCounts(prototype->Class, prototype->Quality);
++}
++
++void AuctionHouseBot::Commands(uint32 command, uint32 ahMapID, uint32 col, char* args)
++{
++    AHBConfig *config = NULL;
++    switch (ahMapID)
++    {
++    case 2:
++        config = &AllianceConfig;
++        break;
++    case 6:
++        config = &HordeConfig;
++        break;
++    case 7:
++        config = &NeutralConfig;
++        break;
++    }
++    std::string color;
++    switch (col)
++    {
++    case AHB_GREY:
++        color = "grey";
++        break;
++    case AHB_WHITE:
++        color = "white";
++        break;
++    case AHB_GREEN:
++        color = "green";
++        break;
++    case AHB_BLUE:
++        color = "blue";
++        break;
++    case AHB_PURPLE:
++        color = "purple";
++        break;
++    case AHB_ORANGE:
++        color = "orange";
++        break;
++    case AHB_YELLOW:
++        color = "yellow";
++        break;
++    default:
++        break;
++    }
++    switch (command)
++    {
++    case 0:     //ahexpire
++        {
++            AuctionHouseObject* auctionHouse =  sAuctionMgr->GetAuctionsMap(config->GetAHFID());
++
++            AuctionHouseObject::AuctionEntryMap::iterator itr;
++            itr = auctionHouse->GetAuctionsBegin();
++
++            while (itr != auctionHouse->GetAuctionsEnd())
++            {
++                if (itr->second->owner == AHBplayerGUID)
++                {
++                    itr->second->expire_time = sWorld->GetGameTime();
++                    uint32 id = itr->second->Id;
++                    uint32 expire_time = itr->second->expire_time;
++                    CharacterDatabase.PExecute("UPDATE auctionhouse SET time = '%u' WHERE id = '%u'", expire_time, id);
++                }
++                ++itr;
++            }
++        }
++        break;
++    case 1:     //min items
++        {
++            char * param1 = strtok(args, " ");
++            uint32 minItems = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET minitems = '%u' WHERE auctionhouse = '%u'", minItems, ahMapID);
++            config->SetMinItems(minItems);
++        }
++        break;
++    case 2:     //max items
++        {
++            char * param1 = strtok(args, " ");
++            uint32 maxItems = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET maxitems = '%u' WHERE auctionhouse = '%u'", maxItems, ahMapID);
++            config->SetMaxItems(maxItems);
++            config->CalculatePercents();
++        }
++        break;
++    case 3:     //min time Deprecated (Place holder for future commands)
++        break;
++    case 4:     //max time Deprecated (Place holder for future commands)
++        break;
++    case 5:     //percentages
++        {
++            char * param1 = strtok(args, " ");
++            char * param2 = strtok(NULL, " ");
++            char * param3 = strtok(NULL, " ");
++            char * param4 = strtok(NULL, " ");
++            char * param5 = strtok(NULL, " ");
++            char * param6 = strtok(NULL, " ");
++            char * param7 = strtok(NULL, " ");
++            char * param8 = strtok(NULL, " ");
++            char * param9 = strtok(NULL, " ");
++            char * param10 = strtok(NULL, " ");
++            char * param11 = strtok(NULL, " ");
++            char * param12 = strtok(NULL, " ");
++            char * param13 = strtok(NULL, " ");
++            char * param14 = strtok(NULL, " ");
++            uint32 greytg = (uint32) strtoul(param1, NULL, 0);
++            uint32 whitetg = (uint32) strtoul(param2, NULL, 0);
++            uint32 greentg = (uint32) strtoul(param3, NULL, 0);
++            uint32 bluetg = (uint32) strtoul(param4, NULL, 0);
++            uint32 purpletg = (uint32) strtoul(param5, NULL, 0);
++            uint32 orangetg = (uint32) strtoul(param6, NULL, 0);
++            uint32 yellowtg = (uint32) strtoul(param7, NULL, 0);
++            uint32 greyi = (uint32) strtoul(param8, NULL, 0);
++            uint32 whitei = (uint32) strtoul(param9, NULL, 0);
++            uint32 greeni = (uint32) strtoul(param10, NULL, 0);
++            uint32 bluei = (uint32) strtoul(param11, NULL, 0);
++            uint32 purplei = (uint32) strtoul(param12, NULL, 0);
++            uint32 orangei = (uint32) strtoul(param13, NULL, 0);
++            uint32 yellowi = (uint32) strtoul(param14, NULL, 0);
++
++            SQLTransaction trans = CharacterDatabase.BeginTransaction();
++            trans->PAppend("UPDATE auctionhousebot SET percentgreytradegoods = '%u' WHERE auctionhouse = '%u'", greytg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentwhitetradegoods = '%u' WHERE auctionhouse = '%u'", whitetg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentgreentradegoods = '%u' WHERE auctionhouse = '%u'", greentg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentbluetradegoods = '%u' WHERE auctionhouse = '%u'", bluetg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentpurpletradegoods = '%u' WHERE auctionhouse = '%u'", purpletg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentorangetradegoods = '%u' WHERE auctionhouse = '%u'", orangetg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentyellowtradegoods = '%u' WHERE auctionhouse = '%u'", yellowtg, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentgreyitems = '%u' WHERE auctionhouse = '%u'", greyi, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentwhiteitems = '%u' WHERE auctionhouse = '%u'", whitei, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentgreenitems = '%u' WHERE auctionhouse = '%u'", greeni, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentblueitems = '%u' WHERE auctionhouse = '%u'", bluei, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentpurpleitems = '%u' WHERE auctionhouse = '%u'", purplei, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentorangeitems = '%u' WHERE auctionhouse = '%u'", orangei, ahMapID);
++            trans->PAppend("UPDATE auctionhousebot SET percentyellowitems = '%u' WHERE auctionhouse = '%u'", yellowi, ahMapID);
++            CharacterDatabase.CommitTransaction( trans);
++            config->SetPercentages(greytg, whitetg, greentg, bluetg, purpletg, orangetg, yellowtg, greyi, whitei, greeni, bluei, purplei, orangei, yellowi);
++        }
++        break;
++    case 6:     //min prices
++        {
++            char * param1 = strtok(args, " ");
++            uint32 minPrice = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET minprice%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), minPrice, ahMapID);
++            config->SetMinPrice(col, minPrice);
++        }
++        break;
++    case 7:     //max prices
++        {
++            char * param1 = strtok(args, " ");
++            uint32 maxPrice = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET maxprice%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), maxPrice, ahMapID);
++            config->SetMaxPrice(col, maxPrice);
++        }
++        break;
++    case 8:     //min bid price
++        {
++            char * param1 = strtok(args, " ");
++            uint32 minBidPrice = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET minbidprice%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), minBidPrice, ahMapID);
++            config->SetMinBidPrice(col, minBidPrice);
++        }
++        break;
++    case 9:     //max bid price
++        {
++            char * param1 = strtok(args, " ");
++            uint32 maxBidPrice = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET maxbidprice%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), maxBidPrice, ahMapID);
++            config->SetMaxBidPrice(col, maxBidPrice);
++        }
++        break;
++    case 10:        //max stacks
++        {
++            char * param1 = strtok(args, " ");
++            uint32 maxStack = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET maxstack%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), maxStack, ahMapID);
++            config->SetMaxStack(col, maxStack);
++        }
++        break;
++    case 11:        //buyer bid prices
++        {
++            char * param1 = strtok(args, " ");
++            uint32 buyerPrice = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET buyerprice%s = '%u' WHERE auctionhouse = '%u'",color.c_str(), buyerPrice, ahMapID);
++            config->SetBuyerPrice(col, buyerPrice);
++        }
++        break;
++    case 12:        //buyer bidding interval
++        {
++            char * param1 = strtok(args, " ");
++            uint32 bidInterval = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET buyerbiddinginterval = '%u' WHERE auctionhouse = '%u'", bidInterval, ahMapID);
++            config->SetBiddingInterval(bidInterval);
++        }
++        break;
++    case 13:        //buyer bids per interval
++        {
++            char * param1 = strtok(args, " ");
++            uint32 bidsPerInterval = (uint32) strtoul(param1, NULL, 0);
++            CharacterDatabase.PExecute("UPDATE auctionhousebot SET buyerbidsperinterval = '%u' WHERE auctionhouse = '%u'", bidsPerInterval, ahMapID);
++            config->SetBidsPerInterval(bidsPerInterval);
++        }
++        break;
++    default:
++        break;
++    }
++}
++
++void AuctionHouseBot::LoadValues(AHBConfig *config)
++{
++    if (debug_Out) sLog->outString(((std::string)("Start Settings for %s Auctionhouses:", CharacterDatabase.PQuery("SELECT name FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetString())).c_str());
++    if (AHBSeller)
++    {
++        //load min and max items
++        config->SetMinItems(CharacterDatabase.PQuery("SELECT minitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxItems(CharacterDatabase.PQuery("SELECT maxitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        //load percentages
++        uint32 greytg = CharacterDatabase.PQuery("SELECT percentgreytradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 whitetg = CharacterDatabase.PQuery("SELECT percentwhitetradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 greentg = CharacterDatabase.PQuery("SELECT percentgreentradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 bluetg = CharacterDatabase.PQuery("SELECT percentbluetradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 purpletg = CharacterDatabase.PQuery("SELECT percentpurpletradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 orangetg = CharacterDatabase.PQuery("SELECT percentorangetradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 yellowtg = CharacterDatabase.PQuery("SELECT percentyellowtradegoods FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 greyi = CharacterDatabase.PQuery("SELECT percentgreyitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 whitei = CharacterDatabase.PQuery("SELECT percentwhiteitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 greeni = CharacterDatabase.PQuery("SELECT percentgreenitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 bluei = CharacterDatabase.PQuery("SELECT percentblueitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 purplei = CharacterDatabase.PQuery("SELECT percentpurpleitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 orangei = CharacterDatabase.PQuery("SELECT percentorangeitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        uint32 yellowi = CharacterDatabase.PQuery("SELECT percentyellowitems FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32();
++        config->SetPercentages(greytg, whitetg, greentg, bluetg, purpletg, orangetg, yellowtg, greyi, whitei, greeni, bluei, purplei, orangei, yellowi);
++        //load min and max prices
++        config->SetMinPrice(AHB_GREY, CharacterDatabase.PQuery("SELECT minpricegrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_GREY, CharacterDatabase.PQuery("SELECT maxpricegrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_WHITE, CharacterDatabase.PQuery("SELECT minpricewhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_WHITE, CharacterDatabase.PQuery("SELECT maxpricewhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_GREEN, CharacterDatabase.PQuery("SELECT minpricegreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_GREEN, CharacterDatabase.PQuery("SELECT maxpricegreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_BLUE, CharacterDatabase.PQuery("SELECT minpriceblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_BLUE, CharacterDatabase.PQuery("SELECT maxpriceblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_PURPLE, CharacterDatabase.PQuery("SELECT minpricepurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_PURPLE, CharacterDatabase.PQuery("SELECT maxpricepurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_ORANGE, CharacterDatabase.PQuery("SELECT minpriceorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_ORANGE, CharacterDatabase.PQuery("SELECT maxpriceorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinPrice(AHB_YELLOW, CharacterDatabase.PQuery("SELECT minpriceyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxPrice(AHB_YELLOW, CharacterDatabase.PQuery("SELECT maxpriceyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        //load min and max bid prices
++        config->SetMinBidPrice(AHB_GREY, CharacterDatabase.PQuery("SELECT minbidpricegrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_GREY, CharacterDatabase.PQuery("SELECT maxbidpricegrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_WHITE, CharacterDatabase.PQuery("SELECT minbidpricewhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_WHITE, CharacterDatabase.PQuery("SELECT maxbidpricewhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_GREEN, CharacterDatabase.PQuery("SELECT minbidpricegreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_GREEN, CharacterDatabase.PQuery("SELECT maxbidpricegreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_BLUE, CharacterDatabase.PQuery("SELECT minbidpriceblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_BLUE, CharacterDatabase.PQuery("SELECT maxbidpriceblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_PURPLE, CharacterDatabase.PQuery("SELECT minbidpricepurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_PURPLE, CharacterDatabase.PQuery("SELECT maxbidpricepurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_ORANGE, CharacterDatabase.PQuery("SELECT minbidpriceorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_ORANGE, CharacterDatabase.PQuery("SELECT maxbidpriceorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMinBidPrice(AHB_YELLOW, CharacterDatabase.PQuery("SELECT minbidpriceyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxBidPrice(AHB_YELLOW, CharacterDatabase.PQuery("SELECT maxbidpriceyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        //load max stacks
++        config->SetMaxStack(AHB_GREY, CharacterDatabase.PQuery("SELECT maxstackgrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_WHITE, CharacterDatabase.PQuery("SELECT maxstackwhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_GREEN, CharacterDatabase.PQuery("SELECT maxstackgreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_BLUE, CharacterDatabase.PQuery("SELECT maxstackblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_PURPLE, CharacterDatabase.PQuery("SELECT maxstackpurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_ORANGE, CharacterDatabase.PQuery("SELECT maxstackorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetMaxStack(AHB_YELLOW, CharacterDatabase.PQuery("SELECT maxstackyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        if (debug_Out)
++        {
++            sLog->outString("minItems                = %u", config->GetMinItems());
++            sLog->outString("maxItems                = %u", config->GetMaxItems());
++            sLog->outString("percentGreyTradeGoods   = %u", config->GetPercentages(AHB_GREY_TG));
++            sLog->outString("percentWhiteTradeGoods  = %u", config->GetPercentages(AHB_WHITE_TG));
++            sLog->outString("percentGreenTradeGoods  = %u", config->GetPercentages(AHB_GREEN_TG));
++            sLog->outString("percentBlueTradeGoods   = %u", config->GetPercentages(AHB_BLUE_TG));
++            sLog->outString("percentPurpleTradeGoods = %u", config->GetPercentages(AHB_PURPLE_TG));
++            sLog->outString("percentOrangeTradeGoods = %u", config->GetPercentages(AHB_ORANGE_TG));
++            sLog->outString("percentYellowTradeGoods = %u", config->GetPercentages(AHB_YELLOW_TG));
++            sLog->outString("percentGreyItems        = %u", config->GetPercentages(AHB_GREY_I));
++            sLog->outString("percentWhiteItems       = %u", config->GetPercentages(AHB_WHITE_I));
++            sLog->outString("percentGreenItems       = %u", config->GetPercentages(AHB_GREEN_I));
++            sLog->outString("percentBlueItems        = %u", config->GetPercentages(AHB_BLUE_I));
++            sLog->outString("percentPurpleItems      = %u", config->GetPercentages(AHB_PURPLE_I));
++            sLog->outString("percentOrangeItems      = %u", config->GetPercentages(AHB_ORANGE_I));
++            sLog->outString("percentYellowItems      = %u", config->GetPercentages(AHB_YELLOW_I));
++            sLog->outString("minPriceGrey            = %u", config->GetMinPrice(AHB_GREY));
++            sLog->outString("maxPriceGrey            = %u", config->GetMaxPrice(AHB_GREY));
++            sLog->outString("minPriceWhite           = %u", config->GetMinPrice(AHB_WHITE));
++            sLog->outString("maxPriceWhite           = %u", config->GetMaxPrice(AHB_WHITE));
++            sLog->outString("minPriceGreen           = %u", config->GetMinPrice(AHB_GREEN));
++            sLog->outString("maxPriceGreen           = %u", config->GetMaxPrice(AHB_GREEN));
++            sLog->outString("minPriceBlue            = %u", config->GetMinPrice(AHB_BLUE));
++            sLog->outString("maxPriceBlue            = %u", config->GetMaxPrice(AHB_BLUE));
++            sLog->outString("minPricePurple          = %u", config->GetMinPrice(AHB_PURPLE));
++            sLog->outString("maxPricePurple          = %u", config->GetMaxPrice(AHB_PURPLE));
++            sLog->outString("minPriceOrange          = %u", config->GetMinPrice(AHB_ORANGE));
++            sLog->outString("maxPriceOrange          = %u", config->GetMaxPrice(AHB_ORANGE));
++            sLog->outString("minPriceYellow          = %u", config->GetMinPrice(AHB_YELLOW));
++            sLog->outString("maxPriceYellow          = %u", config->GetMaxPrice(AHB_YELLOW));
++            sLog->outString("minBidPriceGrey         = %u", config->GetMinBidPrice(AHB_GREY));
++            sLog->outString("maxBidPriceGrey         = %u", config->GetMaxBidPrice(AHB_GREY));
++            sLog->outString("minBidPriceWhite        = %u", config->GetMinBidPrice(AHB_WHITE));
++            sLog->outString("maxBidPriceWhite        = %u", config->GetMaxBidPrice(AHB_WHITE));
++            sLog->outString("minBidPriceGreen        = %u", config->GetMinBidPrice(AHB_GREEN));
++            sLog->outString("maxBidPriceGreen        = %u", config->GetMaxBidPrice(AHB_GREEN));
++            sLog->outString("minBidPriceBlue         = %u", config->GetMinBidPrice(AHB_BLUE));
++            sLog->outString("maxBidPriceBlue         = %u", config->GetMinBidPrice(AHB_BLUE));
++            sLog->outString("minBidPricePurple       = %u", config->GetMinBidPrice(AHB_PURPLE));
++            sLog->outString("maxBidPricePurple       = %u", config->GetMaxBidPrice(AHB_PURPLE));
++            sLog->outString("minBidPriceOrange       = %u", config->GetMinBidPrice(AHB_ORANGE));
++            sLog->outString("maxBidPriceOrange       = %u", config->GetMaxBidPrice(AHB_ORANGE));
++            sLog->outString("minBidPriceYellow       = %u", config->GetMinBidPrice(AHB_YELLOW));
++            sLog->outString("maxBidPriceYellow       = %u", config->GetMaxBidPrice(AHB_YELLOW));
++            sLog->outString("maxStackGrey            = %u", config->GetMaxStack(AHB_GREY));
++            sLog->outString("maxStackWhite           = %u", config->GetMaxStack(AHB_WHITE));
++            sLog->outString("maxStackGreen           = %u", config->GetMaxStack(AHB_GREEN));
++            sLog->outString("maxStackBlue            = %u", config->GetMaxStack(AHB_BLUE));
++            sLog->outString("maxStackPurple          = %u", config->GetMaxStack(AHB_PURPLE));
++            sLog->outString("maxStackOrange          = %u", config->GetMaxStack(AHB_ORANGE));
++            sLog->outString("maxStackYellow          = %u", config->GetMaxStack(AHB_YELLOW));
++        }
++        //AuctionHouseEntry const* ahEntry =  sAuctionMgr->GetAuctionHouseEntry(config->GetAHFID());
++        AuctionHouseObject* auctionHouse =  sAuctionMgr->GetAuctionsMap(config->GetAHFID());
++
++        config->ResetItemCounts();
++        uint32 auctions = auctionHouse->Getcount();
++
++        if (auctions)
++        {
++            for (AuctionHouseObject::AuctionEntryMap::const_iterator itr = auctionHouse->GetAuctionsBegin(); itr != auctionHouse->GetAuctionsEnd(); ++itr)
++            {
++                AuctionEntry *Aentry = itr->second;
++                Item *item =  sAuctionMgr->GetAItem(Aentry->item_guidlow);
++                if (item)
++                {
++                    ItemPrototype const *prototype = item->GetProto();
++                    if (prototype)
++                    {
++                        switch (prototype->Quality)
++                        {
++                        case 0:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_GREY_TG);
++                            else
++                                config->IncItemCounts(AHB_GREY_I);
++                            break;
++                        case 1:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_WHITE_TG);
++                            else
++                                config->IncItemCounts(AHB_WHITE_I);
++                            break;
++                        case 2:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_GREEN_TG);
++                            else
++                                config->IncItemCounts(AHB_GREEN_I);
++                            break;
++                        case 3:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_BLUE_TG);
++                            else
++                                config->IncItemCounts(AHB_BLUE_I);
++                            break;
++                        case 4:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_PURPLE_TG);
++                            else
++                                config->IncItemCounts(AHB_PURPLE_I);
++                            break;
++                        case 5:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_ORANGE_TG);
++                            else
++                                config->IncItemCounts(AHB_ORANGE_I);
++                            break;
++                        case 6:
++                            if (prototype->Class == ITEM_CLASS_TRADE_GOODS)
++                                config->IncItemCounts(AHB_YELLOW_TG);
++                            else
++                                config->IncItemCounts(AHB_YELLOW_I);
++                            break;
++                        }
++                    }
++                }
++            }
++        }
++        if (debug_Out)
++        {
++            sLog->outString(((std::string)("Current Settings for %s Auctionhouses:", CharacterDatabase.PQuery("SELECT name FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetString())).c_str());
++            sLog->outString("Grey Trade Goods\t%u\tGrey Items\t%u", config->GetItemCounts(AHB_GREY_TG), config->GetItemCounts(AHB_GREY_I));
++            sLog->outString("White Trade Goods\t%u\tWhite Items\t%u", config->GetItemCounts(AHB_WHITE_TG), config->GetItemCounts(AHB_WHITE_I));
++            sLog->outString("Green Trade Goods\t%u\tGreen Items\t%u", config->GetItemCounts(AHB_GREEN_TG), config->GetItemCounts(AHB_GREEN_I));
++            sLog->outString("Blue Trade Goods\t%u\tBlue Items\t%u", config->GetItemCounts(AHB_BLUE_TG), config->GetItemCounts(AHB_BLUE_I));
++            sLog->outString("Purple Trade Goods\t%u\tPurple Items\t%u", config->GetItemCounts(AHB_PURPLE_TG), config->GetItemCounts(AHB_PURPLE_I));
++            sLog->outString("Orange Trade Goods\t%u\tOrange Items\t%u", config->GetItemCounts(AHB_ORANGE_TG), config->GetItemCounts(AHB_ORANGE_I));
++            sLog->outString("Yellow Trade Goods\t%u\tYellow Items\t%u", config->GetItemCounts(AHB_YELLOW_TG), config->GetItemCounts(AHB_YELLOW_I));
++        }
++    }
++    if (AHBBuyer)
++    {
++        //load buyer bid prices
++        config->SetBuyerPrice(AHB_GREY, CharacterDatabase.PQuery("SELECT buyerpricegrey FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_WHITE, CharacterDatabase.PQuery("SELECT buyerpricewhite FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_GREEN, CharacterDatabase.PQuery("SELECT buyerpricegreen FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_BLUE, CharacterDatabase.PQuery("SELECT buyerpriceblue FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_PURPLE, CharacterDatabase.PQuery("SELECT buyerpricepurple FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_ORANGE, CharacterDatabase.PQuery("SELECT buyerpriceorange FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        config->SetBuyerPrice(AHB_YELLOW, CharacterDatabase.PQuery("SELECT buyerpriceyellow FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        //load bidding interval
++        config->SetBiddingInterval(CharacterDatabase.PQuery("SELECT buyerbiddinginterval FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        //load bids per interval
++        config->SetBidsPerInterval(CharacterDatabase.PQuery("SELECT buyerbidsperinterval FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetUInt32());
++        if (debug_Out)
++        {
++            sLog->outString("buyerPriceGrey          = %u", config->GetBuyerPrice(AHB_GREY));
++            sLog->outString("buyerPriceWhite         = %u", config->GetBuyerPrice(AHB_WHITE));
++            sLog->outString("buyerPriceGreen         = %u", config->GetBuyerPrice(AHB_GREEN));
++            sLog->outString("buyerPriceBlue          = %u", config->GetBuyerPrice(AHB_BLUE));
++            sLog->outString("buyerPricePurple        = %u", config->GetBuyerPrice(AHB_PURPLE));
++            sLog->outString("buyerPriceOrange        = %u", config->GetBuyerPrice(AHB_ORANGE));
++            sLog->outString("buyerPriceYellow        = %u", config->GetBuyerPrice(AHB_YELLOW));
++            sLog->outString("buyerBiddingInterval    = %u", config->GetBiddingInterval());
++            sLog->outString("buyerBidsPerInterval    = %u", config->GetBidsPerInterval());
++        }
++    }
++    if (debug_Out) sLog->outString(((std::string)("End Settings for %s Auctionhouses:", CharacterDatabase.PQuery("SELECT name FROM auctionhousebot WHERE auctionhouse = %u",config->GetAHID())->Fetch()->GetString())).c_str());
++}
+diff --git a/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
+new file mode 100644
+index 0000000..a7da388
+--- /dev/null
++++ b/src/server/game/AuctionHouse/AuctionHouseBot/AuctionHouseBot.h
+@@ -0,0 +1,1257 @@
++/*
++ * Copyright (C) 2008-2010 Trinity <http://www.trinitycore.org/>
++ * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef AUCTION_HOUSE_BOT_H
++#define AUCTION_HOUSE_BOT_H
++
++#include "World.h"
++#include "Config.h"
++#include "ItemPrototype.h"
++
++#define AHB_GREY        0
++#define AHB_WHITE       1
++#define AHB_GREEN       2
++#define AHB_BLUE        3
++#define AHB_PURPLE      4
++#define AHB_ORANGE      5
++#define AHB_YELLOW      6
++#define AHB_MAX_QUALITY 6
++#define AHB_GREY_TG     0
++#define AHB_WHITE_TG    1
++#define AHB_GREEN_TG    2
++#define AHB_BLUE_TG     3
++#define AHB_PURPLE_TG   4
++#define AHB_ORANGE_TG   5
++#define AHB_YELLOW_TG   6
++#define AHB_GREY_I      7
++#define AHB_WHITE_I     8
++#define AHB_GREEN_I     9
++#define AHB_BLUE_I      10
++#define AHB_PURPLE_I    11
++#define AHB_ORANGE_I    12
++#define AHB_YELLOW_I    13
++#define AHB_GLYPH		14
++
++class AHBConfig
++{
++private:
++    uint32 AHID;
++    uint32 AHFID;
++    uint32 minItems;
++    uint32 maxItems;
++    uint32 percentGreyTradeGoods;
++    uint32 percentWhiteTradeGoods;
++    uint32 percentGreenTradeGoods;
++    uint32 percentBlueTradeGoods;
++    uint32 percentPurpleTradeGoods;
++    uint32 percentOrangeTradeGoods;
++    uint32 percentYellowTradeGoods;
++    uint32 percentGreyItems;
++    uint32 percentWhiteItems;
++    uint32 percentGreenItems;
++    uint32 percentBlueItems;
++    uint32 percentPurpleItems;
++    uint32 percentOrangeItems;
++    uint32 percentYellowItems;
++    uint32 minPriceGrey;
++    uint32 maxPriceGrey;
++    uint32 minBidPriceGrey;
++    uint32 maxBidPriceGrey;
++    uint32 maxStackGrey;
++    uint32 minPriceWhite;
++    uint32 maxPriceWhite;
++    uint32 minBidPriceWhite;
++    uint32 maxBidPriceWhite;
++    uint32 maxStackWhite;
++    uint32 minPriceGreen;
++    uint32 maxPriceGreen;
++    uint32 minBidPriceGreen;
++    uint32 maxBidPriceGreen;
++    uint32 maxStackGreen;
++    uint32 minPriceBlue;
++    uint32 maxPriceBlue;
++    uint32 minBidPriceBlue;
++    uint32 maxBidPriceBlue;
++    uint32 maxStackBlue;
++    uint32 minPricePurple;
++    uint32 maxPricePurple;
++    uint32 minBidPricePurple;
++    uint32 maxBidPricePurple;
++    uint32 maxStackPurple;
++    uint32 minPriceOrange;
++    uint32 maxPriceOrange;
++    uint32 minBidPriceOrange;
++    uint32 maxBidPriceOrange;
++    uint32 maxStackOrange;
++    uint32 minPriceYellow;
++    uint32 maxPriceYellow;
++    uint32 minBidPriceYellow;
++    uint32 maxBidPriceYellow;
++    uint32 maxStackYellow;
++
++    uint32 buyerPriceGrey;
++    uint32 buyerPriceWhite;
++    uint32 buyerPriceGreen;
++    uint32 buyerPriceBlue;
++    uint32 buyerPricePurple;
++    uint32 buyerPriceOrange;
++    uint32 buyerPriceYellow;
++    uint32 buyerBiddingInterval;
++    uint32 buyerBidsPerInterval;
++
++    uint32 greytgp;
++    uint32 whitetgp;
++    uint32 greentgp;
++    uint32 bluetgp;
++    uint32 purpletgp;
++    uint32 orangetgp;
++    uint32 yellowtgp;
++    uint32 greyip;
++    uint32 whiteip;
++    uint32 greenip;
++    uint32 blueip;
++    uint32 purpleip;
++    uint32 orangeip;
++    uint32 yellowip;
++
++    uint32 greyTGoods;
++    uint32 whiteTGoods;
++    uint32 greenTGoods;
++    uint32 blueTGoods;
++    uint32 purpleTGoods;
++    uint32 orangeTGoods;
++    uint32 yellowTGoods;
++
++    uint32 greyItems;
++    uint32 whiteItems;
++    uint32 greenItems;
++    uint32 blueItems;
++    uint32 purpleItems;
++    uint32 orangeItems;
++    uint32 yellowItems;
++
++public:
++    AHBConfig(uint32 ahid)
++    {
++        AHID = ahid;
++        switch(ahid)
++        {
++        case 2:
++            AHFID = 55;
++            break;
++        case 6:
++            AHFID = 29;
++            break;
++        case 7:
++            AHFID = 120;
++            break;
++        default:
++            AHFID = 120;
++            break;
++        }
++    }
++    AHBConfig()
++    {
++    }
++    uint32 GetAHID()
++    {
++        return AHID;
++    }
++    uint32 GetAHFID()
++    {
++        return AHFID;
++    }
++    void SetMinItems(uint32 value)
++    {
++        minItems = value;
++    }
++    uint32 GetMinItems()
++    {
++        if ((minItems == 0) && (maxItems))
++            return maxItems;
++        else if ((maxItems) && (minItems > maxItems))
++            return maxItems;
++        else
++            return minItems;
++    }
++    void SetMaxItems(uint32 value)
++    {
++        maxItems = value;
++    // CalculatePercents() needs to be called, but only if
++    // SetPercentages() has been called at least once already.
++    }
++    uint32 GetMaxItems()
++    {
++        return maxItems;
++    }
++    void SetPercentages(uint32 greytg, uint32 whitetg, uint32 greentg, uint32 bluetg, uint32 purpletg, uint32 orangetg, uint32 yellowtg, uint32 greyi, uint32 whitei, uint32 greeni, uint32 bluei, uint32 purplei, uint32 orangei, uint32 yellowi)
++    {
++        uint32 totalPercent = greytg + whitetg + greentg + bluetg + purpletg + orangetg + yellowtg + greyi + whitei + greeni + bluei + purplei + orangei + yellowi;
++
++        if (totalPercent == 0)
++        {
++            maxItems = 0;
++        }
++        else if (totalPercent != 100)
++        {
++            greytg = 0;
++            whitetg = 27;
++            greentg = 12;
++            bluetg = 10;
++            purpletg = 1;
++            orangetg = 0;
++            yellowtg = 0;
++            greyi = 0;
++            whitei = 10;
++            greeni = 30;
++            bluei = 8;
++            purplei = 2;
++            orangei = 0;
++            yellowi = 0;
++        }
++        percentGreyTradeGoods = greytg;
++        percentWhiteTradeGoods = whitetg;
++        percentGreenTradeGoods = greentg;
++        percentBlueTradeGoods = bluetg;
++        percentPurpleTradeGoods = purpletg;
++        percentOrangeTradeGoods = orangetg;
++        percentYellowTradeGoods = yellowtg;
++        percentGreyItems = greyi;
++        percentWhiteItems = whitei;
++        percentGreenItems = greeni;
++        percentBlueItems = bluei;
++        percentPurpleItems = purplei;
++        percentOrangeItems = orangei;
++        percentYellowItems = yellowi;
++        CalculatePercents();
++    }
++    uint32 GetPercentages(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY_TG:
++            return percentGreyTradeGoods;
++            break;
++        case AHB_WHITE_TG:
++            return percentWhiteTradeGoods;
++            break;
++        case AHB_GREEN_TG:
++            return percentGreenTradeGoods;
++            break;
++        case AHB_BLUE_TG:
++            return percentBlueTradeGoods;
++            break;
++        case AHB_PURPLE_TG:
++            return percentPurpleTradeGoods;
++            break;
++        case AHB_ORANGE_TG:
++            return percentOrangeTradeGoods;
++            break;
++        case AHB_YELLOW_TG:
++            return percentYellowTradeGoods;
++            break;
++        case AHB_GREY_I:
++            return percentGreyItems;
++            break;
++        case AHB_WHITE_I:
++            return percentWhiteItems;
++            break;
++        case AHB_GREEN_I:
++            return percentGreenItems;
++            break;
++        case AHB_BLUE_I:
++            return percentBlueItems;
++            break;
++        case AHB_PURPLE_I:
++            return percentPurpleItems;
++            break;
++        case AHB_ORANGE_I:
++            return percentOrangeItems;
++            break;
++        case AHB_YELLOW_I:
++            return percentYellowItems;
++            break;
++        default:
++            return 0;
++            break;
++        }
++    }
++    void SetMinPrice(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            minPriceGrey = value;
++            break;
++        case AHB_WHITE:
++            minPriceWhite = value;
++            break;
++        case AHB_GREEN:
++            minPriceGreen = value;
++            break;
++        case AHB_BLUE:
++            minPriceBlue = value;
++            break;
++        case AHB_PURPLE:
++            minPricePurple = value;
++            break;
++        case AHB_ORANGE:
++            minPriceOrange = value;
++            break;
++        case AHB_YELLOW:
++            minPriceYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetMinPrice(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            {
++                if (minPriceGrey == 0)
++                    return 100;
++                else if (minPriceGrey > maxPriceGrey)
++                    return maxPriceGrey;
++                else
++                    return minPriceGrey;
++                break;
++            }
++        case AHB_WHITE:
++            {
++                if (minPriceWhite == 0)
++                    return 150;
++                else if (minPriceWhite > maxPriceWhite)
++                    return maxPriceWhite;
++                else
++                    return minPriceWhite;
++                break;
++            }
++        case AHB_GREEN:
++            {
++                if (minPriceGreen == 0)
++                    return 200;
++                else if (minPriceGreen > maxPriceGreen)
++                    return maxPriceGreen;
++                else
++                    return minPriceGreen;
++                break;
++            }
++        case AHB_BLUE:
++            {
++                if (minPriceBlue == 0)
++                    return 250;
++                else if (minPriceBlue > maxPriceBlue)
++                    return maxPriceBlue;
++                else
++                    return minPriceBlue;
++                break;
++            }
++        case AHB_PURPLE:
++            {
++                if (minPricePurple == 0)
++                    return 300;
++                else if (minPricePurple > maxPricePurple)
++                    return maxPricePurple;
++                else
++                    return minPricePurple;
++                break;
++            }
++        case AHB_ORANGE:
++            {
++                if (minPriceOrange == 0)
++                    return 400;
++                else if (minPriceOrange > maxPriceOrange)
++                    return maxPriceOrange;
++                else
++                    return minPriceOrange;
++                break;
++            }
++        case AHB_YELLOW:
++            {
++                if (minPriceYellow == 0)
++                    return 500;
++                else if (minPriceYellow > maxPriceYellow)
++                    return maxPriceYellow;
++                else
++                    return minPriceYellow;
++                break;
++            }
++        default:
++            {
++                return 0;
++                break;
++            }
++        }
++    }
++    void SetMaxPrice(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            maxPriceGrey = value;
++            break;
++        case AHB_WHITE:
++            maxPriceWhite = value;
++            break;
++        case AHB_GREEN:
++            maxPriceGreen = value;
++            break;
++        case AHB_BLUE:
++            maxPriceBlue = value;
++            break;
++        case AHB_PURPLE:
++            maxPricePurple = value;
++            break;
++        case AHB_ORANGE:
++            maxPriceOrange = value;
++            break;
++        case AHB_YELLOW:
++            maxPriceYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetMaxPrice(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            {
++                if (maxPriceGrey == 0)
++                    return 150;
++                else
++                    return maxPriceGrey;
++                break;
++            }
++        case AHB_WHITE:
++            {
++                if (maxPriceWhite == 0)
++                    return 250;
++                else
++                    return maxPriceWhite;
++                break;
++            }
++        case AHB_GREEN:
++            {
++                if (maxPriceGreen == 0)
++                    return 300;
++                else
++                    return maxPriceGreen;
++                break;
++            }
++        case AHB_BLUE:
++            {
++                if (maxPriceBlue == 0)
++                    return 350;
++                else
++                    return maxPriceBlue;
++                break;
++            }
++        case AHB_PURPLE:
++            {
++                if (maxPricePurple == 0)
++                    return 450;
++                else
++                    return maxPricePurple;
++                break;
++            }
++        case AHB_ORANGE:
++            {
++                if (maxPriceOrange == 0)
++                    return 550;
++                else
++                    return maxPriceOrange;
++                break;
++            }
++        case AHB_YELLOW:
++            {
++                if (maxPriceYellow == 0)
++                    return 650;
++                else
++                    return maxPriceYellow;
++                break;
++            }
++        default:
++            {
++                return 0;
++                break;
++            }
++        }
++    }
++    void SetMinBidPrice(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            minBidPriceGrey = value;
++            break;
++        case AHB_WHITE:
++            minBidPriceWhite = value;
++            break;
++        case AHB_GREEN:
++            minBidPriceGreen = value;
++            break;
++        case AHB_BLUE:
++            minBidPriceBlue = value;
++            break;
++        case AHB_PURPLE:
++            minBidPricePurple = value;
++            break;
++        case AHB_ORANGE:
++            minBidPriceOrange = value;
++            break;
++        case AHB_YELLOW:
++            minBidPriceYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetMinBidPrice(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            {
++                if (minBidPriceGrey > 100)
++                    return 100;
++                else
++                    return minBidPriceGrey;
++                break;
++            }
++        case AHB_WHITE:
++            {
++                if (minBidPriceWhite > 100)
++                    return 100;
++                else
++                    return minBidPriceWhite;
++                break;
++            }
++        case AHB_GREEN:
++            {
++                if (minBidPriceGreen > 100)
++                    return 100;
++                else
++                    return minBidPriceGreen;
++                break;
++            }
++        case AHB_BLUE:
++            {
++                if (minBidPriceBlue > 100)
++                    return 100;
++                else
++                    return minBidPriceBlue;
++                break;
++            }
++        case AHB_PURPLE:
++            {
++                if (minBidPricePurple > 100)
++                    return 100;
++                else
++                    return minBidPricePurple;
++                break;
++            }
++        case AHB_ORANGE:
++            {
++                if (minBidPriceOrange > 100)
++                    return 100;
++                else
++                    return minBidPriceOrange;
++                break;
++            }
++        case AHB_YELLOW:
++            {
++                if (minBidPriceYellow > 100)
++                    return 100;
++                else
++                    return minBidPriceYellow;
++                break;
++            }
++        default:
++            {
++                return 0;
++                break;
++            }
++        }
++    }
++    void SetMaxBidPrice(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            maxBidPriceGrey = value;
++            break;
++        case AHB_WHITE:
++            maxBidPriceWhite = value;
++            break;
++        case AHB_GREEN:
++            maxBidPriceGreen = value;
++            break;
++        case AHB_BLUE:
++            maxBidPriceBlue = value;
++            break;
++        case AHB_PURPLE:
++            maxBidPricePurple = value;
++            break;
++        case AHB_ORANGE:
++            maxBidPriceOrange = value;
++            break;
++        case AHB_YELLOW:
++            maxBidPriceYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetMaxBidPrice(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            {
++                if (maxBidPriceGrey > 100)
++                    return 100;
++                else
++                    return maxBidPriceGrey;
++                break;
++            }
++        case AHB_WHITE:
++            {
++                if (maxBidPriceWhite > 100)
++                    return 100;
++                else
++                    return maxBidPriceWhite;
++                break;
++            }
++        case AHB_GREEN:
++            {
++                if (maxBidPriceGreen > 100)
++                    return 100;
++                else
++                    return maxBidPriceGreen;
++                break;
++            }
++        case AHB_BLUE:
++            {
++                if (maxBidPriceBlue > 100)
++                    return 100;
++                else
++                    return maxBidPriceBlue;
++                break;
++            }
++        case AHB_PURPLE:
++            {
++                if (maxBidPricePurple > 100)
++                    return 100;
++                else
++                    return maxBidPricePurple;
++                break;
++            }
++        case AHB_ORANGE:
++            {
++                if (maxBidPriceOrange > 100)
++                    return 100;
++                else
++                    return maxBidPriceOrange;
++                break;
++            }
++        case AHB_YELLOW:
++            {
++                if (maxBidPriceYellow > 100)
++                    return 100;
++                else
++                    return maxBidPriceYellow;
++                break;
++            }
++        default:
++            {
++                return 0;
++                break;
++            }
++        }
++    }
++    void SetMaxStack(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            maxStackGrey = value;
++            break;
++        case AHB_WHITE:
++            maxStackWhite = value;
++            break;
++        case AHB_GREEN:
++            maxStackGreen = value;
++            break;
++        case AHB_BLUE:
++            maxStackBlue = value;
++            break;
++        case AHB_PURPLE:
++            maxStackPurple = value;
++            break;
++        case AHB_ORANGE:
++            maxStackOrange = value;
++            break;
++        case AHB_YELLOW:
++            maxStackYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetMaxStack(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            {
++                return maxStackGrey;
++                break;
++            }
++        case AHB_WHITE:
++            {
++                return maxStackWhite;
++                break;
++            }
++        case AHB_GREEN:
++            {
++                return maxStackGreen;
++                break;
++            }
++        case AHB_BLUE:
++            {
++                return maxStackBlue;
++                break;
++            }
++        case AHB_PURPLE:
++            {
++                return maxStackPurple;
++                break;
++            }
++        case AHB_ORANGE:
++            {
++                return maxStackOrange;
++                break;
++            }
++        case AHB_YELLOW:
++            {
++                return maxStackYellow;
++                break;
++            }
++        default:
++            {
++                return 0;
++                break;
++            }
++        }
++    }
++    void SetBuyerPrice(uint32 color, uint32 value)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            buyerPriceGrey = value;
++            break;
++        case AHB_WHITE:
++            buyerPriceWhite = value;
++            break;
++        case AHB_GREEN:
++            buyerPriceGreen = value;
++            break;
++        case AHB_BLUE:
++            buyerPriceBlue = value;
++            break;
++        case AHB_PURPLE:
++            buyerPricePurple = value;
++            break;
++        case AHB_ORANGE:
++            buyerPriceOrange = value;
++            break;
++        case AHB_YELLOW:
++            buyerPriceYellow = value;
++            break;
++        default:
++            break;
++        }
++    }
++    uint32 GetBuyerPrice(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY:
++            return buyerPriceGrey;
++            break;
++        case AHB_WHITE:
++            return buyerPriceWhite;
++            break;
++        case AHB_GREEN:
++            return buyerPriceGreen;
++            break;
++        case AHB_BLUE:
++            return buyerPriceBlue;
++            break;
++        case AHB_PURPLE:
++            return buyerPricePurple;
++            break;
++        case AHB_ORANGE:
++            return buyerPriceOrange;
++            break;
++        case AHB_YELLOW:
++            return buyerPriceYellow;
++            break;
++        default:
++            return 0;
++            break;
++        }
++    }
++    void SetBiddingInterval(uint32 value)
++    {
++        buyerBiddingInterval = value;
++    }
++    uint32 GetBiddingInterval()
++    {
++        return buyerBiddingInterval;
++    }
++    void CalculatePercents()
++    {
++        greytgp = (uint32) (((double)percentGreyTradeGoods / 100.0) * maxItems);
++        whitetgp = (uint32) (((double)percentWhiteTradeGoods / 100.0) * maxItems);
++        greentgp = (uint32) (((double)percentGreenTradeGoods / 100.0) * maxItems);
++        bluetgp = (uint32) (((double)percentBlueTradeGoods / 100.0) * maxItems);
++        purpletgp = (uint32) (((double)percentPurpleTradeGoods / 100.0) * maxItems);
++        orangetgp = (uint32) (((double)percentOrangeTradeGoods / 100.0) * maxItems);
++        yellowtgp = (uint32) (((double)percentYellowTradeGoods / 100.0) * maxItems);
++        greyip = (uint32) (((double)percentGreyItems / 100.0) * maxItems);
++        whiteip = (uint32) (((double)percentWhiteItems / 100.0) * maxItems);
++        greenip = (uint32) (((double)percentGreenItems / 100.0) * maxItems);
++        blueip = (uint32) (((double)percentBlueItems / 100.0) * maxItems);
++        purpleip = (uint32) (((double)percentPurpleItems / 100.0) * maxItems);
++        orangeip = (uint32) (((double)percentOrangeItems / 100.0) * maxItems);
++        yellowip = (uint32) (((double)percentYellowItems / 100.0) * maxItems);
++        uint32 total = greytgp + whitetgp + greentgp + bluetgp + purpletgp + orangetgp + yellowtgp + greyip + whiteip + greenip + blueip + purpleip + orangeip + yellowip;
++        int32 diff = (maxItems - total);
++        if (diff < 0)
++        {
++            if ((whiteip - diff) > 0)
++                whiteip -= diff;
++            else if ((greenip - diff) > 0)
++                greenip -= diff;
++        }
++        else if (diff < 0)
++        {
++            whiteip += diff;
++        }
++    }
++    uint32 GetPercents(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY_TG:
++            return greytgp;
++            break;
++        case AHB_WHITE_TG:
++            return whitetgp;
++            break;
++        case AHB_GREEN_TG:
++            return greentgp;
++            break;
++        case AHB_BLUE_TG:
++            return bluetgp;
++            break;
++        case AHB_PURPLE_TG:
++            return purpletgp;
++            break;
++        case AHB_ORANGE_TG:
++            return orangetgp;
++            break;
++        case AHB_YELLOW_TG:
++            return yellowtgp;
++            break;
++        case AHB_GREY_I:
++            return greyip;
++            break;
++        case AHB_WHITE_I:
++            return whiteip;
++            break;
++        case AHB_GREEN_I:
++            return greenip;
++            break;
++        case AHB_BLUE_I:
++            return blueip;
++            break;
++        case AHB_PURPLE_I:
++            return purpleip;
++            break;
++        case AHB_ORANGE_I:
++            return orangeip;
++            break;
++        case AHB_YELLOW_I:
++            return yellowip;
++            break;
++        default:
++            return 0;
++            break;
++        }
++    }
++
++    void DecItemCounts(uint32 Class, uint32 Quality)
++    {
++        switch(Class)
++        {
++        case ITEM_CLASS_TRADE_GOODS:
++            DecItemCounts(Quality);
++            break;
++        default:
++            DecItemCounts(Quality + 7);
++            break;
++        }
++    }
++
++    void DecItemCounts(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY_TG:
++            --greyTGoods;
++            break;
++        case AHB_WHITE_TG:
++            --whiteTGoods;
++            break;
++        case AHB_GREEN_TG:
++            --greenTGoods;
++            break;
++        case AHB_BLUE_TG:
++            --blueTGoods;
++            break;
++        case AHB_PURPLE_TG:
++            --purpleTGoods;
++            break;
++        case AHB_ORANGE_TG:
++            --orangeTGoods;
++            break;
++        case AHB_YELLOW_TG:
++            --yellowTGoods;
++            break;
++        case AHB_GREY_I:
++            --greyItems;
++            break;
++        case AHB_WHITE_I:
++            --whiteItems;
++            break;
++        case AHB_GREEN_I:
++            --greenItems;
++            break;
++        case AHB_BLUE_I:
++            --blueItems;
++            break;
++        case AHB_PURPLE_I:
++            --purpleItems;
++            break;
++        case AHB_ORANGE_I:
++            --orangeItems;
++            break;
++        case AHB_YELLOW_I:
++            --yellowItems;
++            break;
++        default:
++            break;
++        }
++    }
++
++    void IncItemCounts(uint32 Class, uint32 Quality)
++    {
++        switch(Class)
++        {
++        case ITEM_CLASS_TRADE_GOODS:
++            IncItemCounts(Quality);
++            break;
++        default:
++            IncItemCounts(Quality + 7);
++            break;
++        }
++    }
++
++    void IncItemCounts(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY_TG:
++            ++greyTGoods;
++            break;
++        case AHB_WHITE_TG:
++            ++whiteTGoods;
++            break;
++        case AHB_GREEN_TG:
++            ++greenTGoods;
++            break;
++        case AHB_BLUE_TG:
++            ++blueTGoods;
++            break;
++        case AHB_PURPLE_TG:
++            ++purpleTGoods;
++            break;
++        case AHB_ORANGE_TG:
++            ++orangeTGoods;
++            break;
++        case AHB_YELLOW_TG:
++            ++yellowTGoods;
++            break;
++        case AHB_GREY_I:
++            ++greyItems;
++            break;
++        case AHB_WHITE_I:
++            ++whiteItems;
++            break;
++        case AHB_GREEN_I:
++            ++greenItems;
++            break;
++        case AHB_BLUE_I:
++            ++blueItems;
++            break;
++        case AHB_PURPLE_I:
++            ++purpleItems;
++            break;
++        case AHB_ORANGE_I:
++            ++orangeItems;
++            break;
++        case AHB_YELLOW_I:
++            ++yellowItems;
++            break;
++        default:
++            break;
++        }
++    }
++
++    void ResetItemCounts()
++    {
++        greyTGoods = 0;
++        whiteTGoods = 0;
++        greenTGoods = 0;
++        blueTGoods = 0;
++        purpleTGoods = 0;
++        orangeTGoods = 0;
++        yellowTGoods = 0;
++
++        greyItems = 0;
++        whiteItems = 0;
++        greenItems = 0;
++        blueItems = 0;
++        purpleItems = 0;
++        orangeItems = 0;
++        yellowItems = 0;
++    }
++
++    uint32 TotalItemCounts()
++    {
++        return(
++        greyTGoods +
++        whiteTGoods +
++        greenTGoods +
++        blueTGoods +
++        purpleTGoods +
++        orangeTGoods +
++        yellowTGoods +
++
++        greyItems +
++        whiteItems +
++        greenItems +
++        blueItems +
++        purpleItems +
++        orangeItems +
++        yellowItems);
++    }
++
++    uint32 GetItemCounts(uint32 color)
++    {
++        switch(color)
++        {
++        case AHB_GREY_TG:
++            return greyTGoods;
++            break;
++        case AHB_WHITE_TG:
++            return whiteTGoods;
++            break;
++        case AHB_GREEN_TG:
++            return greenTGoods;
++            break;
++        case AHB_BLUE_TG:
++            return blueTGoods;
++            break;
++        case AHB_PURPLE_TG:
++            return purpleTGoods;
++            break;
++        case AHB_ORANGE_TG:
++            return orangeTGoods;
++            break;
++        case AHB_YELLOW_TG:
++            return yellowTGoods;
++            break;
++        case AHB_GREY_I:
++            return greyItems;
++            break;
++        case AHB_WHITE_I:
++            return whiteItems;
++            break;
++        case AHB_GREEN_I:
++            return greenItems;
++            break;
++        case AHB_BLUE_I:
++            return blueItems;
++            break;
++        case AHB_PURPLE_I:
++            return purpleItems;
++            break;
++        case AHB_ORANGE_I:
++            return orangeItems;
++            break;
++        case AHB_YELLOW_I:
++            return yellowItems;
++            break;
++        default:
++            return 0;
++            break;
++        }
++    }
++    void SetBidsPerInterval(uint32 value)
++    {
++        buyerBidsPerInterval = value;
++    }
++    uint32 GetBidsPerInterval()
++    {
++        return buyerBidsPerInterval;
++    }
++    ~AHBConfig()
++    {
++    }
++};
++class AuctionHouseBot
++{
++private:
++
++    bool debug_Out;
++    bool debug_Out_Filters;
++
++    bool AHBSeller;
++    bool AHBBuyer;
++    bool BuyMethod;
++    bool SellMethod;
++
++    uint32 AHBplayerAccount;
++    uint32 AHBplayerGUID;
++    uint32 ItemsPerCycle;
++
++    //Begin Filters
++
++    bool Vendor_Items;
++    bool Loot_Items;
++    bool Other_Items;
++    bool Vendor_TGs;
++    bool Loot_TGs;
++    bool Other_TGs;
++
++    bool No_Bind;
++    bool Bind_When_Picked_Up;
++    bool Bind_When_Equipped;
++    bool Bind_When_Use;
++    bool Bind_Quest_Item;
++
++    bool DisableBeta_PTR_Unused;
++    bool DisablePermEnchant;
++    bool DisableConjured;
++    bool DisableGems;
++    bool DisableMoney;
++    bool DisableMoneyLoot;
++    bool DisableLootable;
++    bool DisableKeys;
++    bool DisableDuration;
++    bool DisableBOP_Or_Quest_NoReqLevel;
++
++    bool DisableWarriorItems;
++    bool DisablePaladinItems;
++    bool DisableHunterItems;
++    bool DisableRogueItems;
++    bool DisablePriestItems;
++    bool DisableDKItems;
++    bool DisableShamanItems;
++    bool DisableMageItems;
++    bool DisableWarlockItems;
++    bool DisableUnusedClassItems;
++    bool DisableDruidItems;
++
++    uint32 DisableItemsBelowLevel;
++    uint32 DisableItemsAboveLevel;
++    uint32 DisableTGsBelowLevel;
++    uint32 DisableTGsAboveLevel;
++    uint32 DisableItemsBelowGUID;
++    uint32 DisableItemsAboveGUID;
++    uint32 DisableTGsBelowGUID;
++    uint32 DisableTGsAboveGUID;
++    uint32 DisableItemsBelowReqLevel;
++    uint32 DisableItemsAboveReqLevel;
++    uint32 DisableTGsBelowReqLevel;
++    uint32 DisableTGsAboveReqLevel;
++    uint32 DisableItemsBelowReqSkillRank;
++    uint32 DisableItemsAboveReqSkillRank;
++    uint32 DisableTGsBelowReqSkillRank;
++    uint32 DisableTGsAboveReqSkillRank;
++
++	bool SellGlyphs;
++	uint32 GlyphsCount;
++	uint32 DisableGlyphBelowLevel;
++	uint32 DisableGlyphAboveLevel;
++	uint32 GlyphBuyOutPriceMin;
++	uint32 GlyphBuyOutPriceMax;
++	uint32 GlyphBidPriceMin;
++	uint32 GlyphBidPriceMax;
++
++    //End Filters
++
++    AHBConfig AllianceConfig;
++    AHBConfig HordeConfig;
++    AHBConfig NeutralConfig;
++
++    time_t _lastrun_a;
++    time_t _lastrun_h;
++    time_t _lastrun_n;
++
++    inline uint32 minValue(uint32 a, uint32 b) { return a <= b ? a : b; };
++    void addNewAuctions(Player *AHBplayer, AHBConfig *config);
++    void addNewAuctionBuyerBotBid(Player *AHBplayer, AHBConfig *config, WorldSession *session);
++
++    friend class ACE_Singleton<AuctionHouseBot, ACE_Null_Mutex>;
++    AuctionHouseBot();
++
++public:
++    ~AuctionHouseBot();
++    void Update();
++    void Initialize();
++    void LoadValues(AHBConfig*);
++    void DecrementItemCounts(AuctionEntry* ah, uint32 item_template);
++    void IncrementItemCounts(AuctionEntry* ah);
++    void Commands(uint32, uint32, uint32, char*);
++    uint32 GetAHBplayerGUID() { return AHBplayerGUID; };
++};
++
++#define auctionbot (*ACE_Singleton<AuctionHouseBot, ACE_Null_Mutex>::instance())
++
++#endif
+diff --git a/src/server/game/AuctionHouse/AuctionHouseMgr.cpp b/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
+index 8a04b75..d247b19 100644
+--- a/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
++++ b/src/server/game/AuctionHouse/AuctionHouseMgr.cpp
+@@ -218,7 +218,7 @@ void AuctionHouseMgr::SendAuctionSuccessfulMail(AuctionEntry * auction, SQLTrans
+         uint32 profit = auction->bid + auction->deposit - auctionCut;
+ 
+         //FIXME: what do if owner offline
+-        if (owner)
++        if (owner && owner->GetGUIDLow() != auctionbot.GetAHBplayerGUID())
+         {
+             owner->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_EARNED_BY_AUCTIONS, profit);
+             owner->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_AUCTION_SOLD, auction->bid);
+@@ -248,7 +248,7 @@ void AuctionHouseMgr::SendAuctionExpiredMail(AuctionEntry * auction, SQLTransact
+         std::ostringstream subject;
+         subject << auction->item_template << ":0:" << AUCTION_EXPIRED << ":0:0";
+ 
+-        if (owner)
++        if (owner && owner->GetGUIDLow() != auctionbot.GetAHBplayerGUID())
+             owner->GetSession()->SendAuctionOwnerNotification(auction);
+ 
+         MailDraft(subject.str(), "")                        // TODO: fix body
+@@ -273,6 +273,9 @@ void AuctionHouseMgr::SendAuctionOutbiddedMail(AuctionEntry *auction, uint32 new
+         std::ostringstream msgAuctionOutbiddedSubject;
+         msgAuctionOutbiddedSubject << auction->item_template << ":0:" << AUCTION_OUTBIDDED << ":0:0";
+ 
++        if (oldBidder && !newBidder)
++            oldBidder->GetSession()->SendAuctionBidderNotification(auction->GetHouseId(), auction->Id, auctionbot.GetAHBplayerGUID(), newPrice, auction->GetAuctionOutBid(), auction->item_template);
++
+         if (oldBidder && newBidder)
+             oldBidder->GetSession()->SendAuctionBidderNotification(auction->GetHouseId(), auction->Id, newBidder->GetGUID(), newPrice, auction->GetAuctionOutBid(), auction->item_template);
+ 
+@@ -465,8 +468,10 @@ void AuctionHouseObject::AddAuction(AuctionEntry *auction)
+     sScriptMgr->OnAuctionAdd(this, auction);
+ }
+ 
+-bool AuctionHouseObject::RemoveAuction(AuctionEntry *auction, uint32 /*item_template*/)
++bool AuctionHouseObject::RemoveAuction(AuctionEntry *auction, uint32 item_template)
+ {
++	auctionbot.DecrementItemCounts(auction, item_template);
++
+     bool wasInMap = AuctionsMap.erase(auction->Id) ? true : false;
+ 
+     sScriptMgr->OnAuctionRemove(this, auction);
+diff --git a/src/server/game/AuctionHouse/AuctionHouseMgr.h b/src/server/game/AuctionHouse/AuctionHouseMgr.h
+index bf9edbc..910eed4 100644
+--- a/src/server/game/AuctionHouse/AuctionHouseMgr.h
++++ b/src/server/game/AuctionHouse/AuctionHouseMgr.h
+@@ -25,6 +25,8 @@
+ #include "DatabaseEnv.h"
+ #include "DBCStructure.h"
+ 
++#include "AuctionHouseBot/AuctionHouseBot.h"
++
+ class Item;
+ class Player;
+ class WorldPacket;
+diff --git a/src/server/game/CMakeLists.txt b/src/server/game/CMakeLists.txt
+index 323a3ac..c95cc4b 100644
+--- a/src/server/game/CMakeLists.txt
++++ b/src/server/game/CMakeLists.txt
+@@ -17,6 +17,7 @@ file(GLOB_RECURSE sources_Achievements Achievements/*.cpp Achievements/*.h)
+ file(GLOB_RECURSE sources_Addons Addons/*.cpp Addons/*.h)
+ file(GLOB_RECURSE sources_AI AI/*.cpp AI/*.h)
+ file(GLOB_RECURSE sources_AuctionHouse AuctionHouse/*.cpp AuctionHouse/*.h)
++file(GLOB_RECURSE sources_AuctionHouseBot AuctionHouse/AuctionHouseBot/*.cpp AuctionHouse/AuctionHouseBot/*.h)
+ file(GLOB_RECURSE sources_Battlegrounds Battlegrounds/*.cpp Battlegrounds/*.h)
+ file(GLOB_RECURSE sources_Calendar Calendar/*.cpp Calendar/*.h)
+ file(GLOB_RECURSE sources_Chat Chat/*.cpp Chat/*.h)
+@@ -66,6 +67,7 @@ set(game_STAT_SRCS
+   ${sources_Addons}
+   ${sources_AI}
+   ${sources_AuctionHouse}
++  ${sources_AuctionHouseBot}
+   ${sources_Battlegrounds}
+   ${sources_Calendar}
+   ${sources_Chat}
+@@ -132,6 +134,7 @@ include_directories(
+   ${CMAKE_CURRENT_SOURCE_DIR}/AI/ScriptedAI
+   ${CMAKE_CURRENT_SOURCE_DIR}/AI/SmartScripts
+   ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouse
++  ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouse/AuctionHouseBot
+   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds
+   ${CMAKE_CURRENT_SOURCE_DIR}/Battlegrounds/Zones
+   ${CMAKE_CURRENT_SOURCE_DIR}/Calendar
+diff --git a/src/server/game/Chat/Chat.cpp b/src/server/game/Chat/Chat.cpp
+index fedf1c3..886a8f8 100755
+--- a/src/server/game/Chat/Chat.cpp
++++ b/src/server/game/Chat/Chat.cpp
+@@ -367,6 +367,7 @@ ChatCommand * ChatHandler::getCommandTable()
+ 
+         { "pet",            SEC_GAMEMASTER,     false, NULL,                                           "", petCommandTable },
+         { "ticket",         SEC_MODERATOR,      false,  NULL,                                          "", ticketCommandTable },
++        { "ahbotoptions",   SEC_GAMEMASTER,     true,  OldHandler<&ChatHandler::HandleAHBotOptionsCommand>,        "", NULL },
+ 
+         { "aura",           SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleAuraCommand>,                "", NULL },
+         { "unaura",         SEC_ADMINISTRATOR,  false, OldHandler<&ChatHandler::HandleUnAuraCommand>,              "", NULL },
+diff --git a/src/server/game/Chat/Chat.h b/src/server/game/Chat/Chat.h
+index 486987d..bf56bc8 100755
+--- a/src/server/game/Chat/Chat.h
++++ b/src/server/game/Chat/Chat.h
+@@ -131,6 +131,7 @@ class ChatHandler
+         bool ShowHelpForCommand(ChatCommand *table, const char* cmd);
+         bool ShowHelpForSubCommands(ChatCommand *table, char const* cmd, char const* subcmd);
+ 
++        bool HandleAHBotOptionsCommand(const char * args);
+         bool HandleNameAnnounceCommand(const char* args);
+         bool HandleGMNameAnnounceCommand(const char* args);
+         bool HandleGMAnnounceCommand(const char* args);
+diff --git a/src/server/game/Chat/Commands/Level3.cpp b/src/server/game/Chat/Commands/Level3.cpp
+index 649e1ce..dbb97b3 100755
+--- a/src/server/game/Chat/Commands/Level3.cpp
++++ b/src/server/game/Chat/Commands/Level3.cpp
+@@ -62,6 +62,496 @@
+ #include "Group.h"
+ #include "ChannelMgr.h"
+ 
++#include "AuctionHouseBot.h"
++
++bool ChatHandler::HandleAHBotOptionsCommand(const char *args)
++{
++    uint32 ahMapID = 0;
++    char * opt = strtok((char*)args, " ");
++    char * ahMapIdStr = strtok(NULL, " ");
++    if (ahMapIdStr)
++    {
++        ahMapID = (uint32) strtoul(ahMapIdStr, NULL, 0);
++        switch (ahMapID)
++        {
++        case 2:
++        case 6:
++        case 7:
++            break;
++        default:
++            opt = NULL;
++            break;
++        }
++    }
++    if (!opt)
++    {
++        PSendSysMessage("Syntax is: ahbotoptions $option $ahMapID (2, 6 or 7) $parameter");
++        PSendSysMessage("Try ahbotoptions help to see a list of options.");
++        return false;
++    }
++    int l = strlen(opt);
++
++    if (strncmp(opt,"help",l) == 0)
++    {
++        PSendSysMessage("AHBot commands:");
++        PSendSysMessage("ahexpire");
++        PSendSysMessage("minitems");
++        PSendSysMessage("maxitems");
++        //PSendSysMessage("");
++        //PSendSysMessage("");
++        PSendSysMessage("percentages");
++        PSendSysMessage("minprice");
++        PSendSysMessage("maxprice");
++        PSendSysMessage("minbidprice");
++        PSendSysMessage("maxbidprice");
++        PSendSysMessage("maxstack");
++        PSendSysMessage("buyerprice");
++        PSendSysMessage("bidinterval");
++        PSendSysMessage("bidsperinterval");
++        return true;
++    }
++    else if (strncmp(opt,"ahexpire",l) == 0)
++    {
++        if (!ahMapIdStr)
++        {
++            PSendSysMessage("Syntax is: ahbotoptions ahexpire $ahMapID (2, 6 or 7)");
++            return false;
++        }
++        auctionbot.Commands(0, ahMapID, NULL, NULL);
++    }
++    else if (strncmp(opt,"minitems",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions minitems $ahMapID (2, 6 or 7) $minItems");
++            return false;
++        }
++        auctionbot.Commands(1, ahMapID, NULL, param1);
++    }
++    else if (strncmp(opt,"maxitems",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxitems $ahMapID (2, 6 or 7) $maxItems");
++            return false;
++        }
++        auctionbot.Commands(2, ahMapID, NULL, param1);
++    }
++    else if (strncmp(opt,"mintime",l) == 0)
++    {
++        PSendSysMessage("ahbotoptions mintime has been deprecated");
++        return false;
++        /*
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions mintime $ahMapID (2, 6 or 7) $mintime");
++            return false;
++        }
++        auctionbot.Commands(3, ahMapID, NULL, param1);
++        */
++    }
++    else if (strncmp(opt,"maxtime",l) == 0)
++    {
++        PSendSysMessage("ahbotoptions maxtime has been deprecated");
++        return false;
++        /*
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxtime $ahMapID (2, 6 or 7) $maxtime");
++            return false;
++        }
++        auctionbot.Commands(4, ahMapID, NULL, param1);
++        */
++    }
++    else if (strncmp(opt,"percentages",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        char * param3 = strtok(NULL, " ");
++        char * param4 = strtok(NULL, " ");
++        char * param5 = strtok(NULL, " ");
++        char * param6 = strtok(NULL, " ");
++        char * param7 = strtok(NULL, " ");
++        char * param8 = strtok(NULL, " ");
++        char * param9 = strtok(NULL, " ");
++        char * param10 = strtok(NULL, " ");
++        char * param11 = strtok(NULL, " ");
++        char * param12 = strtok(NULL, " ");
++        char * param13 = strtok(NULL, " ");
++        char * param14 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param14))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions percentages $ahMapID (2, 6 or 7) $1 $2 $3 $4 $5 $6 $7 $8 $9 $10 $11 $12 $13 $14");
++            PSendSysMessage("1 GreyTradeGoods 2 WhiteTradeGoods 3 GreenTradeGoods 4 BlueTradeGoods 5 PurpleTradeGoods");
++            PSendSysMessage("6 OrangeTradeGoods 7 YellowTradeGoods 8 GreyItems 9 WhiteItems 10 GreenItems 11 BlueItems");
++            PSendSysMessage("12 PurpleItems 13 OrangeItems 14 YellowItems");
++            PSendSysMessage("The total must add up to 100%");
++            return false;
++        }
++        uint32 greytg = (uint32) strtoul(param1, NULL, 0);
++        uint32 whitetg = (uint32) strtoul(param2, NULL, 0);
++        uint32 greentg = (uint32) strtoul(param3, NULL, 0);
++        uint32 bluetg = (uint32) strtoul(param3, NULL, 0);
++        uint32 purpletg = (uint32) strtoul(param5, NULL, 0);
++        uint32 orangetg = (uint32) strtoul(param6, NULL, 0);
++        uint32 yellowtg = (uint32) strtoul(param7, NULL, 0);
++        uint32 greyi = (uint32) strtoul(param8, NULL, 0);
++        uint32 whitei = (uint32) strtoul(param9, NULL, 0);
++        uint32 greeni = (uint32) strtoul(param10, NULL, 0);
++        uint32 bluei = (uint32) strtoul(param11, NULL, 0);
++        uint32 purplei = (uint32) strtoul(param12, NULL, 0);
++        uint32 orangei = (uint32) strtoul(param13, NULL, 0);
++        uint32 yellowi = (uint32) strtoul(param14, NULL, 0);
++        uint32 totalPercent = greytg + whitetg + greentg + bluetg + purpletg + orangetg + yellowtg + greyi + whitei + greeni + bluei + purplei + orangei + yellowi;
++        if ((totalPercent == 0) || (totalPercent != 100))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions percentages $ahMapID (2, 6 or 7) $1 $2 $3 $4 $5 $6 $7 $8 $9 $10 $11 $12 $13 $14");
++            PSendSysMessage("1 GreyTradeGoods 2 WhiteTradeGoods 3 GreenTradeGoods 4 BlueTradeGoods 5 PurpleTradeGoods");
++            PSendSysMessage("6 OrangeTradeGoods 7 YellowTradeGoods 8 GreyItems 9 WhiteItems 10 GreenItems 11 BlueItems");
++            PSendSysMessage("12 PurpleItems 13 OrangeItems 14 YellowItems");
++            PSendSysMessage("The total must add up to 100%");
++            return false;
++        }
++        char param[100];
++        param[0] = '\0';
++        strcat(param, param1);
++        strcat(param, " ");
++        strcat(param, param2);
++        strcat(param, " ");
++        strcat(param, param3);
++        strcat(param, " ");
++        strcat(param, param4);
++        strcat(param, " ");
++        strcat(param, param5);
++        strcat(param, " ");
++        strcat(param, param6);
++        strcat(param, " ");
++        strcat(param, param7);
++        strcat(param, " ");
++        strcat(param, param8);
++        strcat(param, " ");
++        strcat(param, param9);
++        strcat(param, " ");
++        strcat(param, param10);
++        strcat(param, " ");
++        strcat(param, param11);
++        strcat(param, " ");
++        strcat(param, param12);
++        strcat(param, " ");
++        strcat(param, param13);
++        strcat(param, " ");
++        strcat(param, param14);
++        auctionbot.Commands(5, ahMapID, NULL, param);
++    }
++    else if (strncmp(opt,"minprice",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions minprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(6, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions minprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"maxprice",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(7, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"minbidprice",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions minbidprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++        uint32 minBidPrice = (uint32) strtoul(param2, NULL, 0);
++        if ((minBidPrice < 1) || (minBidPrice > 100))
++        {
++            PSendSysMessage("The min bid price multiplier must be between 1 and 100");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(8, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions minbidprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"maxbidprice",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxbidprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++        uint32 maxBidPrice = (uint32) strtoul(param2, NULL, 0);
++        if ((maxBidPrice < 1) || (maxBidPrice > 100))
++        {
++            PSendSysMessage("The max bid price multiplier must be between 1 and 100");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(9, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions max bidprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $price");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"maxstack",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxstack $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $value");
++            return false;
++        }
++        uint32 maxStack = (uint32) strtoul(param2, NULL, 0);
++        if (maxStack < 0)
++        {
++            PSendSysMessage("maxstack can't be a negative number.");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(10, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions maxstack $ahMapID (2, 6 or 7) $color (grey, white, green, blue, purple, orange or yellow) $value");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"buyerprice",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        char * param2 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1) || (!param2))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions buyerprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue or purple) $price");
++            return false;
++        }
++        if (strncmp(param1,"grey",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_GREY, param2);
++        }
++        else if (strncmp(param1,"white",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_WHITE, param2);
++        }
++        else if (strncmp(param1,"green",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_GREEN, param2);
++        }
++        else if (strncmp(param1,"blue",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_BLUE, param2);
++        }
++        else if (strncmp(param1,"purple",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_PURPLE, param2);
++        }
++        else if (strncmp(param1,"orange",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_ORANGE, param2);
++        }
++        else if (strncmp(param1,"yellow",l) == 0)
++        {
++            auctionbot.Commands(11, ahMapID, AHB_YELLOW, param2);
++        }
++        else
++        {
++            PSendSysMessage("Syntax is: ahbotoptions buyerprice $ahMapID (2, 6 or 7) $color (grey, white, green, blue or purple) $price");
++            return false;
++        }
++    }
++    else if (strncmp(opt,"bidinterval",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions bidinterval $ahMapID (2, 6 or 7) $interval(in minutes)");
++            return false;
++        }
++        auctionbot.Commands(12, ahMapID, NULL, param1);
++    }
++    else if (strncmp(opt,"bidsperinterval",l) == 0)
++    {
++        char * param1 = strtok(NULL, " ");
++        if ((!ahMapIdStr) || (!param1))
++        {
++            PSendSysMessage("Syntax is: ahbotoptions bidsperinterval $ahMapID (2, 6 or 7) $bids");
++            return false;
++        }
++        auctionbot.Commands(13, ahMapID, NULL, param1);
++    }
++    else
++    {
++        PSendSysMessage("Syntax is: ahbotoptions $option $ahMapID (2, 6 or 7) $parameter");
++        PSendSysMessage("Try ahbotoptions help to see a list of options.");
++        return false;
++    }
++    return true;
++}
++
+ bool ChatHandler::HandleMaxSkillCommand(const char* /*args*/)
+ {
+     Player* SelectedPlayer = getSelectedPlayer();
+diff --git a/src/server/game/Mails/Mail.cpp b/src/server/game/Mails/Mail.cpp
+index 0956fae..e94f9fa 100755
+--- a/src/server/game/Mails/Mail.cpp
++++ b/src/server/game/Mails/Mail.cpp
+@@ -26,6 +26,7 @@
+ #include "BattlegroundMgr.h"
+ #include "Item.h"
+ #include "AuctionHouseMgr.h"
++#include "AuctionHouseBot.h"
+ 
+ MailSender::MailSender(Object* sender, MailStationery stationery) : m_stationery(stationery)
+ {
+@@ -181,6 +182,13 @@ void MailDraft::SendMailTo(SQLTransaction& trans, MailReceiver const& receiver,
+ 
+     uint32 mailId = sObjectMgr->GenerateMailID();
+ 
++    if (receiver.GetPlayerGUIDLow() == auctionbot.GetAHBplayerGUID())
++    {
++        if (sender.GetMailMessageType() == MAIL_AUCTION)        // auction mail with items
++            deleteIncludedItems(trans, true);
++        return;
++    }
++
+     time_t deliver_time = time(NULL) + deliver_delay;
+ 
+     //expire time if COD 3 days, if no COD 30 days, if auction sale pending 1 hour
+diff --git a/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp b/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
+index 6288fb6..4fb9863 100755
+--- a/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
++++ b/src/server/game/Server/Protocol/Handlers/AuctionHouseHandler.cpp
+@@ -22,6 +22,7 @@
+ #include "WorldPacket.h"
+ #include "WorldSession.h"
+ 
++#include "AuctionHouseBot.h"
+ #include "AuctionHouseMgr.h"
+ #include "Log.h"
+ #include "Opcodes.h"
+diff --git a/src/server/game/World/World.cpp b/src/server/game/World/World.cpp
+index b931db7..2c4458a 100755
+--- a/src/server/game/World/World.cpp
++++ b/src/server/game/World/World.cpp
+@@ -71,6 +71,7 @@
+ #include "CreatureTextMgr.h"
+ #include "SmartAI.h"
+ #include "Channel.h"
++#include "AuctionHouseBot.h"
+ 
+ volatile bool World::m_stopEvent = false;
+ uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
+@@ -1706,6 +1707,9 @@ void World::SetInitialWorldSettings()
+     sLog->outString("Calculate random battleground reset time..." );
+     InitRandomBGResetTime();
+ 
++    sLog->outString("Initialize AuctionHouseBot...");
++    auctionbot.Initialize();
++
+     // possibly enable db logging; avoid massive startup spam by doing it here.
+     if (sLog->GetLogDBLater())
+     {
+@@ -1872,6 +1876,7 @@ void World::Update(uint32 diff)
+     /// <ul><li> Handle auctions when the timer has passed
+     if (m_timers[WUPDATE_AUCTIONS].Passed())
+     {
++        auctionbot.Update();
+         m_timers[WUPDATE_AUCTIONS].Reset();
+ 
+         ///- Update mails (return old mails with item, or delete them)
+diff --git a/src/server/worldserver/worldserver.conf.dist b/src/server/worldserver/worldserver.conf.dist
+index d0ccc61..d6e1c67 100644
+--- a/src/server/worldserver/worldserver.conf.dist
++++ b/src/server/worldserver/worldserver.conf.dist
+@@ -2491,6 +2491,289 @@ Network.TcpNodelay = 1
+ #
+ ###################################################################################################
+ 
++###############################################################################
++# AUCTION HOUSE BOT SETTINGS
++#
++#    AuctionHouseBot.DEBUG
++#        Enable/Disable Debugging output
++#    Default 0 (disabled)
++#
++#    AuctionHouseBot.DEBUG_FILTERS
++#        Enable/Disable Debugging output from Filters
++#    Default 0 (disabled)
++#
++#    AuctionHouseBot.EnableSeller
++#        Enable/Disable the part of AHBot that puts items up for auction
++#    Default 0 (disabled)
++#
++#    AuctionHouseBot.EnableBuyer
++#        Enable/Disable the part of AHBot that buys items from players
++#    Default 0 (disabled)
++#
++#    AuctionHouseBot.UseBuyPriceForSeller
++#        Should the Seller use BuyPrice or SellPrice to determine Bid Prices
++#    Default 0 (use SellPrice)
++#
++#    AuctionHouseBot.UseBuyPriceForBuyer
++#        Should the Buyer use BuyPrice or SellPrice to determine Bid Prices
++#    Default 0 (use SellPrice)
++#
++#    Auction House Bot character data
++#        AuctionHouseBot.Account is the account number
++#         (in realmd->account table) of the player you want to run
++#         as the auction bot.
++#        AuctionHouseBot.GUID is the GUID (in characters->characters table)
++#         of the player you want to run as the auction bot.
++#    Default: 0 (Auction House Bot disabled)
++#
++#    AuctionHouseBot.ItemsPerCycle
++#        Number of Items to Add/Remove from the AH during mass operations
++#    Default 200
++#
++###############################################################################
++
++AuctionHouseBot.DEBUG = 0
++AuctionHouseBot.DEBUG_FILTERS = 0
++AuctionHouseBot.EnableSeller = 0
++AuctionHouseBot.EnableBuyer = 0
++AuctionHouseBot.UseBuyPriceForSeller = 0
++AuctionHouseBot.UseBuyPriceForBuyer = 0
++AuctionHouseBot.Account = 0
++AuctionHouseBot.GUID = 0
++AuctionHouseBot.ItemsPerCycle = 200
++
++###############################################################################
++# AUCTION HOUSE BOT FILTERS PART 1
++#
++#    AuctionHouseBot.VendorItems
++#        Include items that can be bought from vendors.
++#    Default 0 (False)
++#
++#    AuctionHouseBot.VendorTradeGoods
++#        Include Trade Goods that can be bought from vendors.
++#    Default 0 (False)
++#
++#    AuctionHouseBot.LootItems
++#        Include items that can be looted or fished for.
++#    Default 1 (True)
++#
++#    AuctionHouseBot.LootTradeGoods
++#        Include Trade Goods that can be looted or fished for.
++#    Default 1 (True)
++#
++#    AuctionHouseBot.OtherItems
++#        Include misc. items.
++#    Default 0 (False)
++#
++#    AuctionHouseBot.OtherTradeGoods
++#        Include misc. Trade Goods.
++#    Default 0 (False)
++#
++#    AuctionHouseBot.Bonding_types
++#        Indicates which bonding types to allow seller to put up for auction
++#            No_Bind
++#             Default 1 (True)
++#            Bind_When_Picked_Up
++#             Default 0 (False)
++#            Bind_When_Equipped
++#             Default 1 (True)
++#            Bind_When_Use
++#             Default 1 (True)
++#            Bind_Quest_Item
++#             Default 0 (False)
++#
++#    AuctionHouseBot.DisableBeta_PTR_Unused
++#        Disable certain items that are usually unavailable to Players
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisablePermEnchant
++#        Disable Items with a Permanent Enchantment
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableConjured
++#        Disable Conjured Items
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableGems
++#        Disable Gems
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableMoney
++#        Disable Items that are used as money
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableMoneyLoot
++#        Disable Items that have Money as a loot
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableLootable
++#        Disable Items that have other items as loot
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableKeys
++#        Disable Items that are keys
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableDuration
++#        Disable Items with a duration
++#    Default 0 (False)
++#
++#    AuctionHouseBot.DisableBOP_Or_Quest_NoReqLevel
++#        Disable items that are BOP or Quest Item
++#        with a Required level that is less than the Item Level
++#        (This prevents a level 10 with a level 60 weapon or armor)
++#        (May need further refinement)
++#    Default 0 (False)
++#
++###############################################################################
++
++AuctionHouseBot.VendorItems = 0
++AuctionHouseBot.VendorTradeGoods = 0
++AuctionHouseBot.LootItems = 1
++AuctionHouseBot.LootTradeGoods = 1
++AuctionHouseBot.OtherItems = 0
++AuctionHouseBot.OtherTradeGoods = 0
++AuctionHouseBot.No_Bind = 1
++AuctionHouseBot.Bind_When_Picked_Up = 0
++AuctionHouseBot.Bind_When_Equipped = 1
++AuctionHouseBot.Bind_When_Use = 1
++AuctionHouseBot.Bind_Quest_Item = 0
++AuctionHouseBot.DisableBeta_PTR_Unused = 0
++AuctionHouseBot.DisablePermEnchant = 0
++AuctionHouseBot.DisableConjured = 0
++AuctionHouseBot.DisableGems = 0
++AuctionHouseBot.DisableMoney = 0
++AuctionHouseBot.DisableMoneyLoot = 0
++AuctionHouseBot.DisableLootable = 0
++AuctionHouseBot.DisableKeys = 0
++AuctionHouseBot.DisableDuration = 0
++AuctionHouseBot.DisableBOP_Or_Quest_NoReqLevel = 0
++
++###############################################################################
++# AUCTION HOUSE BOT FILTERS PART 2
++#
++#     These Filters are boolean (0 or 1) and will disable items that are
++#     specifically meant for the Class named.
++#     (UnusedClass is Class 10, which was skipped for some reason)
++#     Default 0 (allowed)
++#
++###############################################################################
++
++AuctionHouseBot.DisableWarriorItems = 0
++AuctionHouseBot.DisablePaladinItems = 0
++AuctionHouseBot.DisableHunterItems = 0
++AuctionHouseBot.DisableRogueItems = 0
++AuctionHouseBot.DisablePriestItems = 0
++AuctionHouseBot.DisableDKItems = 0
++AuctionHouseBot.DisableShamanItems = 0
++AuctionHouseBot.DisableMageItems = 0
++AuctionHouseBot.DisableWarlockItems = 0
++AuctionHouseBot.DisableUnusedClassItems = 0
++AuctionHouseBot.DisableDruidItems = 0
++
++###############################################################################
++# AUCTION HOUSE BOT FILTERS PART 3
++#
++#    AuctionHouseBot.DisableItemsBelowLevel
++#        Prevent Seller from listing Items below this Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsAboveLevel
++#        Prevent Seller from listing Items above this Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsBelowLevel
++#        Prevent Seller from listing Trade Goods below this Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsAboveLevel
++#        Prevent Seller from listing Trade Goods above this Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsBelowGUID
++#        Prevent Seller from listing Items below this GUID
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsAboveGUID
++#        Prevent Seller from listing Items above this GUID
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsBelowGUID
++#        Prevent Seller from listing Trade Goods below this GUID
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsAboveGUID
++#        Prevent Seller from listing Trade Goods above this GUID
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsBelowReqLevel
++#        Prevent Seller from listing Items below this Required Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsAboveReqLevel
++#        Prevent Seller from listing Items above this Required Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsBelowReqLevel
++#        Prevent Seller from listing Trade Goods below this Required Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsAboveReqLevel
++#        Prevent Seller from listing Trade Goods above this Required Level
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsBelowReqSkillRank
++#        Prevent Seller from listing Items below this Required Skill Rank
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableItemsAboveReqSkillRank
++#        Prevent Seller from listing Items above this Required Skill Rank
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsBelowReqSkillRank
++#        Prevent Seller from listing Trade Goods below this Required Skill Rank
++#    Default 0 (Off)
++#
++#    AuctionHouseBot.DisableTGsAboveReqSkillRank
++#        Prevent Seller from listing Trade Goods above this Required Skill Rank
++#    Default 0 (Off)
++#
++###############################################################################
++
++AuctionHouseBot.DisableItemsBelowLevel = 0
++AuctionHouseBot.DisableItemsAboveLevel = 0
++AuctionHouseBot.DisableTGsBelowLevel = 0
++AuctionHouseBot.DisableTGsAboveLevel = 0
++AuctionHouseBot.DisableItemsBelowGUID = 0
++AuctionHouseBot.DisableItemsAboveGUID = 0
++AuctionHouseBot.DisableTGsBelowGUID = 0
++AuctionHouseBot.DisableTGsAboveGUID = 0
++AuctionHouseBot.DisableItemsBelowReqLevel = 0
++AuctionHouseBot.DisableItemsAboveReqLevel = 0
++AuctionHouseBot.DisableTGsBelowReqLevel = 0
++AuctionHouseBot.DisableTGsAboveReqLevel = 0
++AuctionHouseBot.DisableItemsBelowReqSkillRank = 0
++AuctionHouseBot.DisableItemsAboveReqSkillRank = 0
++AuctionHouseBot.DisableTGsBelowReqSkillRank = 0
++AuctionHouseBot.DisableTGsAboveReqSkillRank = 0
++
++###############################################################################
++# AUCTION HOUSE BOT GLYPHS PART
++#
++#    AuctionHouseBot.SellGlyphs
++#    Default 0 (Off)
++#
++###############################################################################
++
++AuctionHouseBot.SellGlyphs = 0
++AuctionHouseBot.GlyphsCount = 0
++AuctionHouseBot.DisableGlyphBelowLevel = 0
++AuctionHouseBot.DisableGlyphAboveLevel = 0
++AuctionHouseBot.GlyphBuyOutPriceMin = 0
++AuctionHouseBot.GlyphBuyOutPriceMax = 0
++AuctionHouseBot.GlyphBidPriceMin = 0
++AuctionHouseBot.GlyphBidPriceMax = 0
++
+ ###################################################################################################
+ # CONSOLE AND REMOTE ACCESS
+ #
+-- 
+1.7.3.1.msysgit.0
+
